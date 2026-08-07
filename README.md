@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cafetería/Biblioteca
 
-## Getting Started
+Web para una cafetería/pastelería que funciona también como biblioteca: cada
+usuario tiene un perfil donde registra sus lecturas, acumula puntos y
+desbloquea logros con recompensas.
 
-First, run the development server:
+Proyecto de portfolio, desarrollado en solitario y por sprints. El sistema de
+negocio real (POS, facturación fiscal, medios de pago) queda fuera de alcance
+y se simula con datos mock — el foco está puesto en la plataforma de usuarios
+(lecturas, logros, recomendador con IA).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Stack
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- [Next.js 16](https://nextjs.org) (App Router) + TypeScript
+- Tailwind CSS 4
+- Prisma 7 + [Neon](https://neon.tech) (Postgres serverless)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Estructura del proyecto
+app/
+(auth)/ # login, registro
+(user)/ # perfil: lecturas, compras, logros
+admin/ # panel restringido a rol ADMIN (carga de compras simuladas)
+api/ # endpoints reales
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+components/
+ui/ # componentes genéricos, sin lógica de negocio
+<feature>/ # componentes específicos de un dominio
 
-## Learn More
+lib/
+prisma.ts # cliente de Prisma (singleton + adapter de Neon)
+auth/ # hashing, sesión
+points/ # reglas de conversión y evaluación de logros
+ai/ # capa del recomendador de lecturas
 
-To learn more about Next.js, take a look at the following resources:
+types/ # tipos que no vienen generados por Prisma
+prisma/ # schema, migraciones, seed                    
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Correrlo localmente
 
-## Deploy on Vercel
+1. `npm install`
+2. Crear `.env.local` con las credenciales de tu proyecto de Neon:
+DATABASE_URL="postgresql://...pooler.../neondb?..."
+DATABASE_URL_UNPOOLED="postgresql://.../neondb?..."
+3. `npx prisma generate`
+4. `npx prisma migrate dev`
+5. `npm run dev` — abre [http://localhost:3000](http://localhost:3000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Alcance y decisiones
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+El proyecto recorta deliberadamente el sistema de negocio real (ver sección
+"Fuera de alcance" del spec original) para poder completarse en solitario
+como pieza de portfolio.
