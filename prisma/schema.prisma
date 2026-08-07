@@ -1,0 +1,148 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordhash String
+  name         String?
+  role         Role      @default(USER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime? @updatedAt
+
+  userAchievements UserAchievements[]
+  readings         Reading[]
+  purchases        Purchase[]
+  pointsLedgers    PointsLedger[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Book {
+  id        String   @id @default(cuid())
+  title     String
+  author    String
+  isbn      String   @unique
+  coverUrl  String?
+  createdAt DateTime @default(now())
+
+  readings Reading[]
+  products Product[]
+}
+
+model Reading {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  bookId     String
+  book       Book      @relation(fields: [bookId], references: [id])
+  purchaseId String?
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id])
+  date       DateTime  @default(now())
+  rating     Int?
+  comment    String?
+  createdAt  DateTime  @default(now())
+
+  pointsLedgers PointsLedger[]
+}
+
+model Product {
+  id       String          @id @default(cuid())
+  name     String
+  category ProductCategory
+  price    Decimal
+  bookId   String?
+  book     Book?           @relation(fields: [bookId], references: [id])
+
+  purchases Purchase[]
+}
+
+enum ProductCategory {
+  BOOK
+  COFFEE
+  BAKERY
+  OTHER
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  amount    Decimal
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  readings      Reading[]
+  pointsLedgers PointsLedger[]
+}
+
+model PointsLedger {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  sourceType PointsSrc
+  readingId  String?
+  reading    Reading?  @relation(fields: [readingId], references: [id])
+  purchaseId String?
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id])
+  points     Int
+  createdAt  DateTime  @default(now())
+}
+
+enum PointsSrc {
+  PURCHASE
+  READING
+  OTHER
+}
+
+model Achievement {
+  id                String     @id @default(cuid())
+  name              String
+  description       String?
+  conditionType     AchType
+  threshold         Int
+  rewardType        RewardType
+  rewardDescription String?
+  createdAt         DateTime   @default(now())
+
+  userAchievements UserAchievements[]
+}
+
+enum AchType {
+  BOOKS_READ
+  FIRST_PURCHASE
+  TOTAL_POINTS
+  PURCHASE_COUNT
+}
+
+enum RewardType {
+  DISCOUNT_PERCENT
+  FREE_PRODUCT
+  OTHER
+}
+
+model UserAchievements {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+  redeemedAt    DateTime?
+}
