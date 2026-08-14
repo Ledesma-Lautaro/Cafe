@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteReading } from "@/lib/actions/readings";
 
 export default async function ReadingsPage({
   searchParams,
@@ -70,6 +72,20 @@ export default async function ReadingsPage({
             {reading.comment && (
               <p className="text-sm italic">&quot;{reading.comment}&quot;</p>
             )}
+            <div className="mt-2 flex gap-3">
+              <Link
+                href={`/readings/${reading.id}/edit`}
+                className="text-sm text-blue-600"
+              >
+                Editar
+              </Link>
+              <form action={deleteReading.bind(null, reading.id)}>
+
+                <button type="submit" className="text-sm text-red-600 cursor-pointer">
+                  Eliminar
+                </button>
+              </form>
+            </div>
           </li>
         ))}
       </ul>
@@ -80,5 +96,5 @@ export default async function ReadingsPage({
         </p>
       )}
     </div>
-  );    
+  );
 }

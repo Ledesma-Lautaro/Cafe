@@ -3,8 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 const createReadingSchema = z.object({
-  title: z.string().min(1, "El titulo es requerido"),
-  author: z.string().min(1, "El autor es requerido"),
+  title: z.string().trim().min(1, "El titulo es requerido"),
+  author: z.string().trim().min(1, "El autor es requerido"),
   isbn: z.string().optional(),
   date: z.coerce.date(),
   rating: z.number().min(1).max(5).optional(),
@@ -34,8 +34,8 @@ export async function POST(request: Request) {
     if (!book) {
         book = await prisma.book.findFirst({
             where: {
-                title: parsed.data.title,
-                author: parsed.data.author,
+                title: { equals: parsed.data.title, mode: "insensitive" },
+                author: { equals: parsed.data.author, mode: "insensitive" },
             },
         })
     }
