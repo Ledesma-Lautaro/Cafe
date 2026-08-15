@@ -18,6 +18,12 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
+  const purchases = await prisma.purchase.findMany({
+    where: { userId: session.user.id },
+    include: { product: true },
+    orderBy: { date: "desc" },
+  });
+
   return (
     <div className="mx-auto max-w-sm py-16">
       <h1 className="text-2xl font-bold">Tu perfil</h1>
@@ -25,6 +31,24 @@ export default async function ProfilePage() {
         Miembro desde {user.createdAt.toLocaleDateString("es-AR")}
       </p>
       <ProfileForm initialName={user.name} email={user.email} />
+            <h2 className="mt-10 text-xl font-bold">Historial de compras</h2>
+      <ul className="mt-4 flex flex-col gap-3">
+        {purchases.map((purchase) => (
+          <li key={purchase.id} className="rounded border p-3">
+            <p className="font-semibold">{purchase.product.name}</p>
+            <p className="text-sm text-gray-500">
+              {purchase.date.toLocaleDateString("es-AR")} — $
+              {purchase.amount.toString()}
+            </p>
+          </li>
+        ))}
+      </ul>
+
+      {purchases.length === 0 && (
+        <p className="mt-4 text-sm text-gray-500">
+          Todavía no tenés compras registradas.
+        </p>
+      )}
     </div>
   );
 }

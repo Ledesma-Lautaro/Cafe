@@ -42,11 +42,6 @@ export default async function AdminPage() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="amount">Monto</label>
-          <input id="amount" name="amount" type="number" step="0.01" required className="rounded border px-3 py-2" />
-        </div>
-
-        <div className="flex flex-col gap-1">
           <label htmlFor="date">Fecha</label>
           <input
             id="date"

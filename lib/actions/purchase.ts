@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 const createPurchaseSchema = z.object({
   userId: z.string().min(1),
   productId: z.string().min(1),
-  amount: z.coerce.number().positive(),
   date: z.coerce.date(),
 });
 
@@ -21,7 +20,6 @@ export async function createPurchase(formData: FormData) {
   const parsed = createPurchaseSchema.safeParse({
     userId: formData.get("userId"),
     productId: formData.get("productId"),
-    amount: formData.get("amount"),
     date: formData.get("date"),
   });
 
@@ -29,7 +27,14 @@ export async function createPurchase(formData: FormData) {
     throw new Error("Datos inválidos");
   }
 
-  await prisma.purchase.create({ data: parsed.data });
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id: parsed.data.productId },
+  });
+
+  await prisma.purchase.create({
+    data: { ...parsed.data, amount: product.price },
+  });
 
   revalidatePath("/admin");
+  revalidatePath("/profile");
 }
