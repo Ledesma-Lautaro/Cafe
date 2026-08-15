@@ -1,4 +1,18 @@
 import { prisma } from "../lib/prisma";
+import bcrypt from "bcryptjs";
+
+function randomItem<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function randomDateInLastMonths(months: number): Date {
+  const now = new Date();
+  const past = new Date();
+  past.setMonth(now.getMonth() - months);
+  const randomTime =
+    past.getTime() + Math.random() * (now.getTime() - past.getTime());
+  return new Date(randomTime);
+}
 
 async function main() {
   const products = [
@@ -37,23 +51,39 @@ async function main() {
     },
   });
 
-  const user = await prisma.user.findFirst();
-  if (user) {
-    const hasPurchase = await prisma.purchase.findFirst({
+  const allProducts = await prisma.product.findMany();
+
+  const demoUsers = [
+    { email: "ana@demo.com", name: "Ana García", password: "demo1234" },
+    { email: "bruno@demo.com", name: "Bruno Pérez", password: "demo1234" },
+    { email: "carla@demo.com", name: "Carla Díaz", password: "demo1234" },
+  ];
+
+  for (const demo of demoUsers) {
+    const passwordhash = await bcrypt.hash(demo.password, 10);
+    const user = await prisma.user.upsert({
+      where: { email: demo.email },
+      update: {},
+      create: { email: demo.email, name: demo.name, passwordhash },
+    });
+
+    const hasPurchases = await prisma.purchase.findFirst({
       where: { userId: user.id },
     });
-    if (!hasPurchase) {
-      const coffee = await prisma.product.findFirstOrThrow({
-        where: { category: "COFFEE" },
-      });
-      await prisma.purchase.create({
-        data: {
+
+    if (!hasPurchases) {
+      const purchaseCount = Math.floor(Math.random() * 11) + 5; // entre 5 y 15
+      const purchases = Array.from({ length: purchaseCount }, () => {
+        const product = randomItem(allProducts);
+        return {
           userId: user.id,
-          productId: coffee.id,
-          amount: coffee.price,
-          date: new Date(),
-        },
+          productId: product.id,
+          amount: product.price,
+          date: randomDateInLastMonths(6),
+        };
       });
+
+      await prisma.purchase.createMany({ data: purchases });
     }
   }
 }
