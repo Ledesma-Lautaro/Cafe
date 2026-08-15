@@ -54,6 +54,81 @@ async function main() {
 
   const allProducts = await prisma.product.findMany();
 
+  const achievements = [
+    {
+      name: "Primera compra",
+      description: "Realizaste tu primera compra en el local",
+      conditionType: "FIRST_PURCHASE" as const,
+      threshold: 1,
+      rewardType: "DISCOUNT_PERCENT" as const,
+      rewardDescription: "10% de descuento en tu próxima compra",
+    },
+    {
+      name: "Lector iniciado",
+      description: "Registraste 5 lecturas",
+      conditionType: "BOOKS_READ" as const,
+      threshold: 5,
+      rewardType: "FREE_PRODUCT" as const,
+      rewardDescription: "Un café gratis",
+    },
+    {
+      name: "Lector frecuente",
+      description: "Registraste 10 lecturas",
+      conditionType: "BOOKS_READ" as const,
+      threshold: 10,
+      rewardType: "DISCOUNT_PERCENT" as const,
+      rewardDescription: "15% de descuento en tu próxima compra",
+    },
+    {
+      name: "Lector voraz",
+      description: "Registraste 20 lecturas",
+      conditionType: "BOOKS_READ" as const,
+      threshold: 20,
+      rewardType: "FREE_PRODUCT" as const,
+      rewardDescription: "Una porción de torta gratis",
+    },
+    {
+      name: "Cliente habitual",
+      description: "Realizaste 5 compras",
+      conditionType: "PURCHASE_COUNT" as const,
+      threshold: 5,
+      rewardType: "DISCOUNT_PERCENT" as const,
+      rewardDescription: "10% de descuento en tu próxima compra",
+    },
+    {
+      name: "Cliente fiel",
+      description: "Realizaste 15 compras",
+      conditionType: "PURCHASE_COUNT" as const,
+      threshold: 15,
+      rewardType: "FREE_PRODUCT" as const,
+      rewardDescription: "Una medialuna gratis",
+    },
+    {
+      name: "100 puntos",
+      description: "Acumulaste 100 puntos",
+      conditionType: "TOTAL_POINTS" as const,
+      threshold: 100,
+      rewardType: "DISCOUNT_PERCENT" as const,
+      rewardDescription: "5% de descuento en tu próxima compra",
+    },
+    {
+      name: "500 puntos",
+      description: "Acumulaste 500 puntos",
+      conditionType: "TOTAL_POINTS" as const,
+      threshold: 500,
+      rewardType: "FREE_PRODUCT" as const,
+      rewardDescription: "Un libro con 20% de descuento",
+    },
+  ];
+
+  for (const achievement of achievements) {
+    await prisma.achievement.upsert({
+      where: { name: achievement.name },
+      update: {},
+      create: achievement,
+    });
+  }
+
   const demoUsers = [
     { email: "ana@demo.com", name: "Ana García", password: "demo1234" },
     { email: "bruno@demo.com", name: "Bruno Pérez", password: "demo1234" },
@@ -74,7 +149,7 @@ async function main() {
 
     if (!hasPurchases) {
       const purchasesCount = Math.floor(Math.random() * 11) + 5;
-      for(let i = 0; i<purchasesCount; i ++){
+      for (let i = 0; i < purchasesCount; i++) {
         const product = randomItem(allProducts);
         await prisma.$transaction(async (tx) => {
           const purchase = await tx.purchase.create({
@@ -82,11 +157,16 @@ async function main() {
               userId: user.id,
               productId: product.id,
               amount: product.price,
-              date: randomDateInLastMonths(6)
+              date: randomDateInLastMonths(6),
             },
           });
-          await awardPurchasePoints(tx, user.id, purchase.id, Number(product.price))
-        })
+          await awardPurchasePoints(
+            tx,
+            user.id,
+            purchase.id,
+            Number(product.price),
+          );
+        });
       }
     }
   }
