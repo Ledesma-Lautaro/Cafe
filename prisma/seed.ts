@@ -1,3 +1,4 @@
+import { awardPurchasePoints } from "@/lib/points";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcryptjs";
 
@@ -72,18 +73,21 @@ async function main() {
     });
 
     if (!hasPurchases) {
-      const purchaseCount = Math.floor(Math.random() * 11) + 5; // entre 5 y 15
-      const purchases = Array.from({ length: purchaseCount }, () => {
+      const purchasesCount = Math.floor(Math.random() * 11) + 5;
+      for(let i = 0; i<purchasesCount; i ++){
         const product = randomItem(allProducts);
-        return {
-          userId: user.id,
-          productId: product.id,
-          amount: product.price,
-          date: randomDateInLastMonths(6),
-        };
-      });
-
-      await prisma.purchase.createMany({ data: purchases });
+        await prisma.$transaction(async (tx) => {
+          const purchase = await tx.purchase.create({
+            data: {
+              userId: user.id,
+              productId: product.id,
+              amount: product.price,
+              date: randomDateInLastMonths(6)
+            },
+          });
+          await awardPurchasePoints(tx, user.id, purchase.id, Number(product.price))
+        })
+      }
     }
   }
 }
