@@ -2,6 +2,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { awardReadingPoints } from "@/lib/points";
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 
 const createReadingSchema = z.object({
   title: z.string().trim().min(1, "El titulo es requerido"),
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
         comment: parsed.data.comment,
       },
     });
-    await awardReadingPoints(tx, session.user.id, reading.id)
+    await awardReadingPoints(tx, session.user.id, reading.id);
+    await checkAndUnlockAchievements(tx, session.user.id);
     return reading;
   });
 

@@ -1,6 +1,7 @@
 import { awardPurchasePoints } from "@/lib/points";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcryptjs";
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 
 function randomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
@@ -166,6 +167,7 @@ async function main() {
             purchase.id,
             Number(product.price),
           );
+          await checkAndUnlockAchievements(tx, user.id)
         });
       }
     }

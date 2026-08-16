@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { awardPurchasePoints } from "../points";
+import { checkAndUnlockAchievements } from "../achievements";
 
 const createPurchaseSchema = z.object({
   userId: z.string().min(1),
@@ -37,6 +38,7 @@ export async function createPurchase(formData: FormData) {
       data: { ...parsed.data, amount: product.price },
     })
     await awardPurchasePoints(tx, parsed.data.userId, purchase.id, Number(product.price))
+    await checkAndUnlockAchievements(tx, parsed.data.userId);
   });
 
   revalidatePath("/admin");
