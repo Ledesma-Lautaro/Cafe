@@ -36,8 +36,11 @@ model Book {
   id        String   @id @default(cuid())
   title     String
   author    String
-  isbn      String?   @unique
+  isbn      String?  @unique
   coverUrl  String?
+  genre     String?
+  synopsis  String?
+  embedding Unsupported("vector(384)")?
   createdAt DateTime @default(now())
 
   readings Reading[]
@@ -98,9 +101,9 @@ model PointsLedger {
   user       User      @relation(fields: [userId], references: [id])
   sourceType PointsSrc
   readingId  String?
-  reading    Reading?  @relation(fields: [readingId], references: [id])
+  reading    Reading?  @relation(fields: [readingId], references: [id], onDelete:Cascade)
   purchaseId String?
-  purchase   Purchase? @relation(fields: [purchaseId], references: [id])
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id], onDelete:Cascade)
   points     Int
   createdAt  DateTime  @default(now())
 }

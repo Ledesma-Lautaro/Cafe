@@ -3,11 +3,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { awardReadingPoints } from "@/lib/points";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
+import { generateEmbedding, saveBookEmbedding, bookEmbeddingText } from "@/lib/embeddings";
 
 const createReadingSchema = z.object({
   title: z.string().trim().min(1, "El titulo es requerido"),
   author: z.string().trim().min(1, "El autor es requerido"),
   isbn: z.string().optional(),
+  genre: z.string().optional(),
+  synopsis: z.string().optional(),
   date: z.coerce.date(),
   rating: z.number().min(1).max(5).optional(),
   comment: z.string().optional(),
@@ -48,8 +51,13 @@ export async function POST(request: Request) {
         title: parsed.data.title,
         author: parsed.data.author,
         isbn: parsed.data.isbn,
+        genre: parsed.data.genre,
+        synopsis: parsed.data.synopsis,
       },
     });
+    const embedding = await generateEmbedding(bookEmbeddingText(book));
+    await saveBookEmbedding(book.id, embedding);
+  
   }
 
   const reading = await prisma.$transaction(async (tx) => {
@@ -67,6 +75,5 @@ export async function POST(request: Request) {
     return reading;
   });
 
-  return Response.json({reading}, {status: 201})
-
+  return Response.json({ reading }, { status: 201 });
 }

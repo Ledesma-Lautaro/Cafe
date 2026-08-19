@@ -2,7 +2,167 @@ import { awardPurchasePoints } from "@/lib/points";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcryptjs";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
+import { searchGoogleBooks } from "@/lib/google-books";
+import {
+  generateEmbedding,
+  saveBookEmbedding,
+  bookEmbeddingText,
+} from "@/lib/embeddings";
+import { awardReadingPoints } from "@/lib/points";
 
+const CATALOG_ISBNS: Record<string, string[]> = {
+  fantasia: [
+    "9788445077498", 
+    "9788445077948", 
+    "9788417951610", 
+    "9788401023965", 
+    "9786073123662", 
+    "9788408231363", 
+    "9788447300099", 
+    "9788466658843", 
+    "9788490691779", 
+    "9780755379927", 
+    "9788418174438", 
+    "9786070782824", 
+  ],
+  cienciaFiccion: [
+    "9788445008492", 
+    "9788499084367", 
+    "9788435033022", 
+    "9780812416299", 
+    "9788466367677", 
+    "9786073177443", 
+    "9789505470006", 
+    "9788490695289", 
+    "9788445075951", 
+  ],
+  clasicos: [
+    "9788467009248",
+    "9788439731764", 
+    "9788491054870", 
+    "9786558944683",
+    "9788583866343", 
+    "9788420683409",
+    "9781482615425",
+    "9788489666153", 
+    "9788419233790", 
+  ],
+  contemporanea: [
+    "9788415594048", 
+    "9786073114417", 
+    "9788408143086", 
+    "9788420476452", 
+    "9788497592192", 
+    "9788483837108", 
+    "9788483836712", 
+    "9788415631804", 
+    "9788439728801", 
+  ],
+  ensayo: [
+    "9780829771213", 
+    "9786073184762", 
+    "9788499926643", 
+    "9788484327899", 
+    "9788434501782", 
+    "9788499922072", 
+    "9788449328176", 
+    "9788408060154", 
+    "9788413625652", 
+    "9788432303326", 
+  ],
+};
+
+const DEMO_TASTES: Record<string, string> = {
+  "ana@demo.com": "fantasia",
+  "bruno@demo.com": "cienciaFiccion",
+  "carla@demo.com": "clasicos",
+};
+
+async function seedDemoReadings(booksByTheme: Record<string, string[]>) {
+  for (const [email, theme] of Object.entries(DEMO_TASTES)) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) continue;
+
+    const hasReadings = await prisma.reading.findFirst({
+      where: { userId: user.id },
+    });
+    if (hasReadings) continue;
+
+    for (const bookId of (booksByTheme[theme] ?? []).slice(0, 6)) {
+      await prisma.$transaction(async (tx) => {
+        const reading = await tx.reading.create({
+          data: {
+            userId: user.id,
+            bookId,
+            date: randomDateInLastMonths(12),
+            rating: Math.floor(Math.random() * 3) + 3,
+          },
+        });
+        await awardReadingPoints(tx, user.id, reading.id);
+        await checkAndUnlockAchievements(tx, user.id);
+      });
+    }
+  }
+}
+
+async function seedCatalog(): Promise<Record<string, string[]>> {
+  const booksByTheme: Record<string, string[]> = {};
+
+  for (const [theme, isbns] of Object.entries(CATALOG_ISBNS)) {
+    booksByTheme[theme] = [];
+
+    for (const isbn of isbns) {
+      const existing = await prisma.book.findUnique({ where: { isbn } });
+      if (existing) {
+        booksByTheme[theme].push(existing.id);
+        continue;
+      }
+
+      const [result] = await searchGoogleBooks(`isbn:${isbn}`, 1);
+      if (!result) {
+        console.warn(`Sin resultados para isbn:${isbn}`);
+        continue;
+      }
+      if (result.isbn !== isbn) {
+        console.warn(
+          `ISBN no coincide: pedido ${isbn}, recibido ${result.isbn ?? "ninguno"} (${result.title})`,
+        );
+        continue;
+      }
+
+      const book = await prisma.book.create({
+        data: {
+          title: result.title,
+          author: result.author,
+          isbn: result.isbn,
+          genre: result.genre,
+          synopsis: result.synopsis,
+        },
+      });
+      booksByTheme[theme].push(book.id);
+    }
+  }
+
+  return booksByTheme;
+}
+
+async function generateMissingEmbeddings() {
+  const pending = await prisma.$queryRaw<
+    {
+      id: string;
+      title: string;
+      author: string;
+      genre: string | null;
+      synopsis: string | null;
+    }[]
+  >`SELECT id, title, author, genre, synopsis FROM "Book" WHERE embedding IS NULL`;
+
+  console.log(`Generando embeddings para ${pending.length} libros...`);
+  for (const book of pending) {
+    const embedding = await generateEmbedding(bookEmbeddingText(book));
+    await saveBookEmbedding(book.id, embedding);
+  }
+}
 function randomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
@@ -167,11 +327,14 @@ async function main() {
             purchase.id,
             Number(product.price),
           );
-          await checkAndUnlockAchievements(tx, user.id)
+          await checkAndUnlockAchievements(tx, user.id);
         });
       }
     }
   }
+  const booksByTheme = await seedCatalog();
+  await generateMissingEmbeddings();
+  await seedDemoReadings(booksByTheme);
 }
 
 main()

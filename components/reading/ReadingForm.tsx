@@ -9,6 +9,8 @@ export function ReadingForm() {
       title: string;
       author: string;
       isbn?: string;
+      genre?: string;
+      synopsis?: string;
     }[]
   >([]);
   const [isSearching, setIsSearhching] = useState(false);
@@ -19,6 +21,8 @@ export function ReadingForm() {
   const [date, setDate] = useState("");
   const [rating, setRating] = useState("");
   const [comment, setComment] = useState("");
+  const [genre, setGenre] = useState<string | undefined>(undefined);
+  const [synopsis, setSynopsis] = useState<string | undefined>(undefined);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -47,10 +51,14 @@ export function ReadingForm() {
     title: string;
     author: string;
     isbn?: string;
+    genre?: string;
+    synopsis?: string;
   }) {
     setTitle(result.title);
     setAuthor(result.author);
     setIsbn(result.isbn);
+    setGenre(result.genre)
+    setSynopsis(result.synopsis)
     setResults([]);
     setQuery(result.title);
   }
@@ -71,6 +79,8 @@ export function ReadingForm() {
           date,
           rating: rating ? Number(rating) : undefined,
           comment: comment || undefined,
+          genre,
+          synopsis,
         }),
       });
 
