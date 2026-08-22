@@ -8,7 +8,7 @@ function normalize(text: string) {
 }
 
 function truncateAtSentence(text: string, maxChars: number) {
-  if (text.length <= maxChars) return text;
+  if (text.length <= maxChars) {return text;}
   const cut = text.slice(0, maxChars);
   const lastStop = Math.max(
     cut.lastIndexOf(". "),

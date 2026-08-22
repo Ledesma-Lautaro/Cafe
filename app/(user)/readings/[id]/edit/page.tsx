@@ -7,14 +7,14 @@ export default async function EditReadingPage(
   props: PageProps<"/readings/[id]/edit">,
 ) {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user) {redirect("/login");}
 
   const { id } = await props.params;
   const reading = await prisma.reading.findUnique({
     where: { id, userId: session.user.id },
   });
 
-  if (!reading) notFound();
+  if (!reading) {notFound();}
 
   return <EditReadingForm reading={reading} />;
 }

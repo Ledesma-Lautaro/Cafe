@@ -13,7 +13,7 @@ const strategy = (process.argv[2] as ProfileStrategy) ?? "maxSimilarity";
 const centered = process.argv[3] === "centered";
 
 function intraListDiversity(vectors: number[][]): number {
-  if (vectors.length < 2) return 0;
+  if (vectors.length < 2) {return 0;}
 
   let sum = 0;
   let pairs = 0;

@@ -57,9 +57,39 @@ function averageVectors(
   return result;
 }
 
+async function getPopularBooks(userId: string, limit: number): Promise<Recommendation[]> {
+   const rows = await prisma.$queryRaw<
+    { id: string; title: string; author: string; readers: number; avg_rating: number | null }[]
+  >`
+    SELECT b.id, b.title, b.author,
+           COUNT(r.id)::int as readers,
+           AVG(r.rating)::float as avg_rating
+    FROM "Book" b
+    LEFT JOIN "Reading" r ON r."bookId" = b.id
+    WHERE b.id NOT IN (SELECT "bookId" FROM "Reading" WHERE "userId" = ${userId})
+    GROUP BY b.id, b.title, b.author
+    ORDER BY readers DESC, avg_rating DESC NULLS LAST, b."createdAt" ASC
+    LIMIT ${limit}
+  `;
+
+  const top = rows[0]?.readers ?? 0;
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    author: row.author,
+    score: top > 0 ? row.readers / top : 0,
+    reason:
+      row.readers > 0
+        ? `Leído por ${row.readers} ${row.readers === 1 ? "persona" : "personas"}` +
+          (row.avg_rating ? ` · ${row.avg_rating.toFixed(1)}★` : "")
+        : "Novedad en el catálogo",
+  }));
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
-  for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+  for (let i = 0; i < a.length; i++) {dot += a[i] * b[i];}
   return dot;
 }
 
@@ -90,8 +120,12 @@ export async function getRecommendations(
   `;
 
   const history = allRead.filter((row) => !excluded.has(row.readingId));
-  if (history.length === 0) {
-    return { recommendations: [], coldStart: true, rankedCandidateIds: [] };
+   if (history.length === 0) {
+    return {
+      recommendations: await getPopularBooks(userId, limit),
+      coldStart: true,
+      rankedCandidateIds: [],
+    };
   }
 
     const candidates = await prisma.$queryRaw<CandidateRow[]>`
@@ -145,8 +179,8 @@ export async function getRecommendations(
   const acceptedVectors: number[][] = [];
 
   for (const candidate of scored) {
-    if (recommendations.length >= limit) break;
-    if (candidate.bestSimilarity > SIMILARITY_THRESHOLD) continue;
+    if (recommendations.length >= limit) {break;}
+    if (candidate.bestSimilarity > SIMILARITY_THRESHOLD) {continue;}
     if (
       acceptedVectors.some(
         (v) => cosineSimilarity(candidate.vector, v) > SIMILARITY_THRESHOLD,

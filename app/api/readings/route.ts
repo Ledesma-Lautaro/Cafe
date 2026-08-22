@@ -3,7 +3,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { awardReadingPoints } from "@/lib/points";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
-import { generateEmbedding, saveBookEmbedding, bookEmbeddingText } from "@/lib/embeddings";
+import {
+  generateEmbedding,
+  saveBookEmbedding,
+  bookEmbeddingText,
+} from "@/lib/embeddings";
 import { findWikipediaPage } from "@/lib/wikipedia";
 
 const createReadingSchema = z.object({
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
     });
   }
 
-    if (!book) {
+  if (!book) {
     const wiki = await findWikipediaPage(parsed.data.title, parsed.data.author);
 
     book = await prisma.book.create({
@@ -60,8 +64,15 @@ export async function POST(request: Request) {
       },
     });
 
-    const embedding = await generateEmbedding(bookEmbeddingText(book));
-    await saveBookEmbedding(book.id, embedding);
+    try {
+      const embedding = await generateEmbedding(bookEmbeddingText(book));
+      await saveBookEmbedding(book.id, embedding);
+    } catch (error) {
+      console.error(
+        `No se pudo generar el embedding de "${book.title}":`,
+        error,
+      );
+    }
   }
   const reading = await prisma.$transaction(async (tx) => {
     const reading = await tx.reading.create({

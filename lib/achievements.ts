@@ -26,7 +26,7 @@ export async function checkAndUnlockAchievements(tx: TransactionClient, userId: 
   const unlockedIds = new Set(alreadyUnlocked.map((u) => u.achievementId));
 
   for (const achievement of achievements) {
-    if (unlockedIds.has(achievement.id)) continue;
+    if (unlockedIds.has(achievement.id)) {continue;}
 
     const conditionMet =
       (achievement.conditionType === "BOOKS_READ" && stats.booksRead >= achievement.threshold) ||

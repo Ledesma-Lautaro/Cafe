@@ -110,24 +110,24 @@ async function seedDemoReadings(booksByTheme: Record<string, string[]>) {
 
   for (const [profileIndex, profile] of DEMO_PROFILES.entries()) {
     const user = await prisma.user.findUnique({ where: { email: profile.email } });
-    if (!user) continue;
+    if (!user) {continue;}
 
     const hasReadings = await prisma.reading.findFirst({ where: { userId: user.id } });
-    if (hasReadings) continue;
+    if (hasReadings) {continue;}
 
     const picked: { bookId: string; rating: number }[] = [];
     const used = new Set<string>();
 
     profile.mix.forEach(([theme, count], themeIndex) => {
       const pool = booksByTheme[theme] ?? [];
-      if (pool.length === 0) return;
+      if (pool.length === 0) {return;}
 
       const rating = Math.max(5 - themeIndex, 3);
       let taken = 0;
 
       for (let i = 0; i < pool.length && taken < count; i++) {
         const bookId = pool[(i + profileIndex) % pool.length];
-        if (used.has(bookId)) continue;
+        if (used.has(bookId)) {continue;}
         used.add(bookId);
         picked.push({ bookId, rating });
         taken++;

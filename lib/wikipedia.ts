@@ -38,7 +38,7 @@ function mentionsAuthor(page: WikipediaPage, author: string): boolean {
   const words = normalize(author.split(",")[0])
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 4);
-  if (words.length === 0) return false;
+  if (words.length === 0) {return false;}
   const haystack = normalize(`${page.description ?? ""} ${page.extract}`);
   return words.some((w) => haystack.includes(w));
 }
@@ -50,9 +50,9 @@ export async function findWikipediaPage(
   const cleaned = cleanTitle(title);
   try {
     const page = (await fetchWikipediaPages([cleaned])).get(cleaned);
-    if (!page) return null;
-    if (isDisambiguation(page)) return null;
-    if (!mentionsAuthor(page, author)) return null;
+    if (!page) {return null;}
+    if (isDisambiguation(page)) {return null;}
+    if (!mentionsAuthor(page, author)) {return null;}
     return page;
   } catch {
     return null;
@@ -82,18 +82,18 @@ export async function fetchWikipediaPages(
     const data = await res.json();
 
     const alias = new Map<string, string>();
-    for (const n of data.query?.normalized ?? []) alias.set(n.from, n.to);
-    for (const r of data.query?.redirects ?? []) alias.set(r.from, r.to);
+    for (const n of data.query?.normalized ?? []) {alias.set(n.from, n.to);}
+    for (const r of data.query?.redirects ?? []) {alias.set(r.from, r.to);}
 
     const pages: ApiPage[] = data.query?.pages ?? [];
     const byTitle = new Map(pages.map((p) => [p.title, p]));
 
     for (const requested of chunk) {
       let key = requested;
-      for (let hop = 0; hop < 3 && alias.has(key); hop++) key = alias.get(key)!;
+      for (let hop = 0; hop < 3 && alias.has(key); hop++) {key = alias.get(key)!;}
 
       const page = byTitle.get(key);
-      if (!page || page.missing || !page.extract) continue;
+      if (!page || page.missing || !page.extract) {continue;}
 
       result.set(requested, {
         title: page.title,
@@ -103,7 +103,7 @@ export async function fetchWikipediaPages(
     }
 
     if (i + BATCH_SIZE < titles.length)
-      await new Promise((r) => setTimeout(r, 1000));
+      {await new Promise((r) => setTimeout(r, 1000));}
   }
 
   return result;
