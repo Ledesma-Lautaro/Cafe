@@ -5,7 +5,6 @@ import { useState, type FormEvent } from "react";
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,7 +18,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name: name || undefined }),
+        body: JSON.stringify({ email, password}),
       });
 
       if (res.ok) {
@@ -38,7 +37,7 @@ export default function RegisterPage() {
       } else {
         setError("Ocurrió un error inesperado. Intente de nuevo más tarde.");
       }
-    } catch (error) {
+    } catch {
       setError(
         "No se pudo conectar con el servidor. Intente de nuevo más tarde.",
       );

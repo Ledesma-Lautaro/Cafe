@@ -9,93 +9,139 @@ import {
   bookEmbeddingText,
 } from "@/lib/embeddings";
 import { awardReadingPoints } from "@/lib/points";
+import { fetchWikipediaPages } from "@/lib/wikipedia";
+
+
+const WIKIPEDIA_ARTICLES: Record<string, string> = {
+  "9780755379927": "American Gods",
+  "9788439728801": "Americanah",
+  "9781482615425": "Ana Karenina",
+  "9788415594048": "Bajo la misma estrella",
+  "9788484327899": "Brevísima historia del tiempo",
+  "9788439731764": "Cien años de soledad",
+  "9788418174438": "Coraline",
+  "9788491054870": "Crimen y castigo",
+  "9789505470006": "Crónicas marcianas",
+  "9788445077948": "El hobbit",
+  "9788490691779": "El camino de los reyes",
+  "9788415631804": "El cuento de la criada",
+  "9788434501782": "El gen egoísta",
+  "9788408231363": "The Lion, the Witch and the Wardrobe",
+  "9788401023965": "El nombre del viento",
+  "9788490695289": "El problema de los tres cuerpos",
+  "9788466658843": "Elantris",
+  "9786073177443": "Fahrenheit 451",
+  "9786073123662": "Juego de tronos",
+  "9788483837108": "Kafka en la orilla",
+  "9788497592192": "La casa de los espíritus",
+  "9788447300099": "La historia interminable",
+  "9788420476452": "Los detectives salvajes",
+  "9788420683409": "Los miserables",
+  "9788413625652": "Los orígenes del totalitarismo",
+  "9788445075951": "Neuromante",
+  "9788467009248": "Odisea",
+  "9788583866343": "Orgullo y prejuicio",
+  "9788419233790": "Pedro Páramo",
+  "9788499922072": "Pensar rápido, pensar despacio",
+  "9788499084367": "Serie de la Fundación",
+  "9788466367677": "Un mundo feliz",
+  "9788432303326": "Vigilar y castigar",
+  "9788435033022": "Yo, robot",
+  "9788445008492": "¿Sueñan los androides con ovejas eléctricas?",
+
+  // corregidos a mano (desambiguación o variante de título)
+  "9788408143086": "La chica del tren (novela)",
+  "9788489666153": "Rayuela (novela)",
+  "9786073114417": "El alquimista (novela)",
+  "9788408060154": "El mundo y sus demonios",
+  "9786070782824": "El ojo del mundo",
+  "9788445077498": "La Comunidad del Anillo",
+  "9788499926643": "Homo Deus: Breve historia del mañana",
+  "9786558944683": "Madame Bovary",
+  "9780812416299": "1984 (novela)",
+  "9786073184762": "Sapiens: De animales a dioses",
+  "9788483836712": "Tokio blues (Norwegian Wood)",
+};
 
 const CATALOG_ISBNS: Record<string, string[]> = {
   fantasia: [
-    "9788445077498", 
-    "9788445077948", 
-    "9788417951610", 
-    "9788401023965", 
-    "9786073123662", 
-    "9788408231363", 
-    "9788447300099", 
-    "9788466658843", 
-    "9788490691779", 
-    "9780755379927", 
-    "9788418174438", 
-    "9786070782824", 
+    "9788445077498", "9788445077948", "9788417951610", "9788401023965",
+    "9786073123662", "9788408231363", "9788447300099", "9788466658843",
+    "9788490691779", "9780755379927", "9788418174438", "9786070782824",
   ],
   cienciaFiccion: [
-    "9788445008492", 
-    "9788499084367", 
-    "9788435033022", 
-    "9780812416299", 
-    "9788466367677", 
-    "9786073177443", 
-    "9789505470006", 
-    "9788490695289", 
-    "9788445075951", 
+    "9788445008492", "9788499084367", "9788435033022", "9780812416299",
+    "9788466367677", "9786073177443", "9789505470006", "9788490695289",
+    "9788445075951",
   ],
   clasicos: [
-    "9788467009248",
-    "9788439731764", 
-    "9788491054870", 
-    "9786558944683",
-    "9788583866343", 
-    "9788420683409",
-    "9781482615425",
-    "9788489666153", 
-    "9788419233790", 
+    "9788467009248", "9788439731764", "9788491054870", "9786558944683",
+    "9788583866343", "9788420683409", "9781482615425", "9788489666153",
+    "9788419233790",
   ],
   contemporanea: [
-    "9788415594048", 
-    "9786073114417", 
-    "9788408143086", 
-    "9788420476452", 
-    "9788497592192", 
-    "9788483837108", 
-    "9788483836712", 
-    "9788415631804", 
-    "9788439728801", 
+    "9788415594048", "9786073114417", "9788408143086", "9788420476452",
+    "9788497592192", "9788483837108", "9788483836712", "9788415631804",
+    "9788439728801",
   ],
   ensayo: [
-    "9780829771213", 
-    "9786073184762", 
-    "9788499926643", 
-    "9788484327899", 
-    "9788434501782", 
-    "9788499922072", 
-    "9788449328176", 
-    "9788408060154", 
-    "9788413625652", 
-    "9788432303326", 
+    "9780829771213", "9786073184762", "9788499926643", "9788484327899",
+    "9788434501782", "9788499922072", "9788449328176", "9788408060154",
+    "9788413625652", "9788432303326",
   ],
 };
 
-const DEMO_TASTES: Record<string, string> = {
-  "ana@demo.com": "fantasia",
-  "bruno@demo.com": "cienciaFiccion",
-  "carla@demo.com": "clasicos",
-};
+const DEMO_PROFILES: {
+  email: string;
+  name: string;
+  mix: [string, number][];
+}[] = [
+  { email: "ana@demo.com",    name: "Ana García",    mix: [["fantasia", 5], ["contemporanea", 2]] },
+  { email: "bruno@demo.com",  name: "Bruno Pérez",   mix: [["cienciaFiccion", 7]] },
+  { email: "carla@demo.com",  name: "Carla Díaz",    mix: [["clasicos", 5], ["contemporanea", 2]] },
+  { email: "diego@demo.com",  name: "Diego Ruiz",    mix: [["cienciaFiccion", 5], ["ensayo", 2]] },
+  { email: "elena@demo.com",  name: "Elena Sosa",    mix: [["contemporanea", 5], ["clasicos", 2]] },
+  { email: "fabian@demo.com", name: "Fabián Molina", mix: [["ensayo", 5], ["cienciaFiccion", 2]] },
+  { email: "gabi@demo.com",   name: "Gabi Torres",   mix: [["fantasia", 4], ["cienciaFiccion", 3]] },
+  { email: "hugo@demo.com",   name: "Hugo Vega",     mix: [["fantasia", 2], ["ensayo", 2], ["clasicos", 2]] },
+];
 
 async function seedDemoReadings(booksByTheme: Record<string, string[]>) {
-  for (const [email, theme] of Object.entries(DEMO_TASTES)) {
-    const user = await prisma.user.findUnique({ where: { email } });
+
+  for (const [profileIndex, profile] of DEMO_PROFILES.entries()) {
+    const user = await prisma.user.findUnique({ where: { email: profile.email } });
     if (!user) continue;
 
-    const hasReadings = await prisma.reading.findFirst({
-      where: { userId: user.id },
-    });
+    const hasReadings = await prisma.reading.findFirst({ where: { userId: user.id } });
     if (hasReadings) continue;
 
-    for (const bookId of (booksByTheme[theme] ?? []).slice(0, 6)) {
+    const picked: { bookId: string; rating: number }[] = [];
+    const used = new Set<string>();
+
+    profile.mix.forEach(([theme, count], themeIndex) => {
+      const pool = booksByTheme[theme] ?? [];
+      if (pool.length === 0) return;
+
+      const rating = Math.max(5 - themeIndex, 3);
+      let taken = 0;
+
+      for (let i = 0; i < pool.length && taken < count; i++) {
+        const bookId = pool[(i + profileIndex) % pool.length];
+        if (used.has(bookId)) continue;
+        used.add(bookId);
+        picked.push({ bookId, rating });
+        taken++;
+      }
+    });
+
+    for (const item of picked) {
       await prisma.$transaction(async (tx) => {
         const reading = await tx.reading.create({
           data: {
             userId: user.id,
-            bookId,
+            bookId: item.bookId,
             date: randomDateInLastMonths(12),
-            rating: Math.floor(Math.random() * 3) + 3,
+            rating: item.rating,
           },
         });
         await awardReadingPoints(tx, user.id, reading.id);
@@ -174,6 +220,46 @@ function randomDateInLastMonths(months: number): Date {
   const randomTime =
     past.getTime() + Math.random() * (now.getTime() - past.getTime());
   return new Date(randomTime);
+}
+
+async function enrichFromWikipedia() {
+  const pending = await prisma.book.findMany({
+    where: { isbn: { in: Object.keys(WIKIPEDIA_ARTICLES) }, synopsisSource: null },
+    select: { isbn: true },
+  });
+
+  if (pending.length === 0) {
+    console.log("Wikipedia: nada pendiente de enriquecer");
+    return;
+  }
+
+  const isbns = pending.map((p) => p.isbn!).filter((isbn) => WIKIPEDIA_ARTICLES[isbn]);
+  const pages = await fetchWikipediaPages(isbns.map((isbn) => WIKIPEDIA_ARTICLES[isbn]));
+
+  let updated = 0;
+  for (const isbn of isbns) {
+    const page = pages.get(WIKIPEDIA_ARTICLES[isbn]);
+    if (!page) {
+      console.warn(`Sin extract: "${WIKIPEDIA_ARTICLES[isbn]}" (isbn ${isbn})`);
+      continue;
+    }
+
+    await prisma.book.updateMany({
+      where: { isbn },
+      data: {
+        synopsis: page.extract,
+        genre: page.description ?? undefined,
+        synopsisSource: "wikipedia",
+      },
+    });
+    updated++;
+  }
+
+  await prisma.$executeRaw`
+    UPDATE "Book" SET embedding = NULL WHERE "synopsisSource" = 'wikipedia'
+  `;
+
+  console.log(`Enriquecidos desde Wikipedia: ${updated}/${isbns.length}`);
 }
 
 async function main() {
@@ -290,14 +376,8 @@ async function main() {
     });
   }
 
-  const demoUsers = [
-    { email: "ana@demo.com", name: "Ana García", password: "demo1234" },
-    { email: "bruno@demo.com", name: "Bruno Pérez", password: "demo1234" },
-    { email: "carla@demo.com", name: "Carla Díaz", password: "demo1234" },
-  ];
-
-  for (const demo of demoUsers) {
-    const passwordhash = await bcrypt.hash(demo.password, 10);
+    for (const demo of DEMO_PROFILES) {
+    const passwordhash = await bcrypt.hash("demo1234", 10);
     const user = await prisma.user.upsert({
       where: { email: demo.email },
       update: {},
@@ -333,6 +413,7 @@ async function main() {
     }
   }
   const booksByTheme = await seedCatalog();
+  await enrichFromWikipedia();
   await generateMissingEmbeddings();
   await seedDemoReadings(booksByTheme);
 }

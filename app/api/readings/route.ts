@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { awardReadingPoints } from "@/lib/points";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { generateEmbedding, saveBookEmbedding, bookEmbeddingText } from "@/lib/embeddings";
+import { findWikipediaPage } from "@/lib/wikipedia";
 
 const createReadingSchema = z.object({
   title: z.string().trim().min(1, "El titulo es requerido"),
@@ -45,21 +46,23 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!book) {
+    if (!book) {
+    const wiki = await findWikipediaPage(parsed.data.title, parsed.data.author);
+
     book = await prisma.book.create({
       data: {
         title: parsed.data.title,
         author: parsed.data.author,
         isbn: parsed.data.isbn,
-        genre: parsed.data.genre,
-        synopsis: parsed.data.synopsis,
+        genre: wiki?.description ?? parsed.data.genre,
+        synopsis: wiki?.extract ?? parsed.data.synopsis,
+        synopsisSource: wiki ? "wikipedia" : "google",
       },
     });
+
     const embedding = await generateEmbedding(bookEmbeddingText(book));
     await saveBookEmbedding(book.id, embedding);
-  
   }
-
   const reading = await prisma.$transaction(async (tx) => {
     const reading = await tx.reading.create({
       data: {

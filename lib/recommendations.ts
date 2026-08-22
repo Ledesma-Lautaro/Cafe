@@ -2,6 +2,18 @@ import { prisma } from "@/lib/prisma";
 
 export const RECOMMENDATION_COUNT = 5;
 const SIMILARITY_THRESHOLD = 0.95;
+export type ProfileStrategy = "centroid" | "maxSimilarity";
+
+function normalizeVector(v: number[]): number[] {
+  const norm = Math.sqrt(v.reduce((sum, x) => sum + x * x, 0));
+  return norm === 0 ? v : v.map((x) => x / norm);
+}
+
+export interface RecommendationResult {
+  recommendations: Recommendation[];
+  coldStart: boolean;
+  rankedCandidateIds: string[];
+}
 
 export interface Recommendation {
   id: string;
@@ -27,11 +39,13 @@ interface CandidateRow {
   distance: number;
 }
 
-function parseVector(text: string): number[] {
+export function parseVector(text: string): number[] {
   return text.slice(1, -1).split(",").map(Number);
 }
 
-function averageVectors(items: { embedding: number[]; weight: number }[]): number[] {
+function averageVectors(
+  items: { embedding: number[]; weight: number }[],
+): number[] {
   const dims = items[0].embedding.length;
   const totalWeight = items.reduce((sum, i) => sum + i.weight, 0);
   const result = new Array(dims).fill(0);
@@ -43,7 +57,7 @@ function averageVectors(items: { embedding: number[]; weight: number }[]): numbe
   return result;
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
   for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
   return dot;
@@ -51,10 +65,21 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 export async function getRecommendations(
   userId: string,
-  opts: { limit?: number; excludeReadingIds?: string[] } = {},
-): Promise<{ recommendations: Recommendation[]; coldStart: boolean }> {
+  opts: {
+    limit?: number;
+    excludeReadingIds?: string[];
+    strategy?: ProfileStrategy;
+    centered?: boolean;
+  } = {},
+): Promise<{
+  recommendations: Recommendation[];
+  coldStart: boolean;
+  rankedCandidateIds: string[];
+}> {
   const limit = opts.limit ?? RECOMMENDATION_COUNT;
+  const strategy = opts.strategy ?? "centroid";
   const excluded = new Set(opts.excludeReadingIds ?? []);
+  const centered = opts.centered ?? false;
 
   const allRead = await prisma.$queryRaw<ReadRow[]>`
     SELECT r.id as "readingId", b.id as "bookId", b.title,
@@ -66,61 +91,79 @@ export async function getRecommendations(
 
   const history = allRead.filter((row) => !excluded.has(row.readingId));
   if (history.length === 0) {
-    return { recommendations: [], coldStart: true };
+    return { recommendations: [], coldStart: true, rankedCandidateIds: [] };
   }
+
+    const candidates = await prisma.$queryRaw<CandidateRow[]>`
+    SELECT id, title, author, embedding::text as embedding
+    FROM "Book"
+    WHERE embedding IS NOT NULL
+  `;
+
+  const parsed = candidates.map((c) => ({ ...c, vector: parseVector(c.embedding) }));
+
+  const corpusMean = averageVectors(parsed.map((c) => ({ embedding: c.vector, weight: 1 })));
+
+  const adjust = (v: number[]): number[] =>
+    centered ? normalizeVector(v.map((x, i) => x - corpusMean[i])) : v;
 
   const readVectors = history.map((row) => ({
     bookId: row.bookId,
     title: row.title,
-    embedding: parseVector(row.embedding),
+    embedding: adjust(parseVector(row.embedding)),
     weight: row.rating ?? 3,
   }));
 
   const readBookIds = new Set(readVectors.map((r) => r.bookId));
-  const userVector = averageVectors(readVectors);
-  const userVectorLiteral = `[${userVector.join(",")}]`;
+  const userVector = normalizeVector(averageVectors(readVectors));
 
-  const candidates = await prisma.$queryRaw<CandidateRow[]>`
-    SELECT id, title, author, embedding::text as embedding,
-           embedding <=> ${userVectorLiteral}::vector AS distance
-    FROM "Book"
-    WHERE embedding IS NOT NULL
-    ORDER BY distance ASC
-  `;
+  const scored = parsed
+    .filter((c) => !readBookIds.has(c.id))
+    .map((candidate) => {
+      const vector = adjust(candidate.vector);
+
+      let bestMatch = readVectors[0];
+      let bestSimilarity = -Infinity;
+      for (const read of readVectors) {
+        const similarity = cosineSimilarity(vector, read.embedding);
+        if (similarity > bestSimilarity) {
+          bestSimilarity = similarity;
+          bestMatch = read;
+        }
+      }
+
+      const score =
+        strategy === "maxSimilarity" ? bestSimilarity : cosineSimilarity(vector, userVector);
+
+      return { ...candidate, vector, bestMatch, bestSimilarity, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const rankedCandidateIds = scored.map((c) => c.id);
 
   const recommendations: Recommendation[] = [];
   const acceptedVectors: number[][] = [];
 
-  for (const candidate of candidates) {
+  for (const candidate of scored) {
     if (recommendations.length >= limit) break;
-    if (readBookIds.has(candidate.id)) continue;
-
-    const candidateVector = parseVector(candidate.embedding);
-
-    let bestMatch = readVectors[0];
-    let bestSimilarity = -Infinity;
-    for (const read of readVectors) {
-      const similarity = cosineSimilarity(candidateVector, read.embedding);
-      if (similarity > bestSimilarity) {
-        bestSimilarity = similarity;
-        bestMatch = read;
-      }
-    }
-    if (bestSimilarity > SIMILARITY_THRESHOLD) continue;
-
-    if (acceptedVectors.some((v) => cosineSimilarity(candidateVector, v) > SIMILARITY_THRESHOLD)) {
+    if (candidate.bestSimilarity > SIMILARITY_THRESHOLD) continue;
+    if (
+      acceptedVectors.some(
+        (v) => cosineSimilarity(candidate.vector, v) > SIMILARITY_THRESHOLD,
+      )
+    ) {
       continue;
     }
 
-    acceptedVectors.push(candidateVector);
+    acceptedVectors.push(candidate.vector);
     recommendations.push({
       id: candidate.id,
       title: candidate.title,
       author: candidate.author,
-      score: 1 - Number(candidate.distance),
-      reason: `Similar a "${bestMatch.title}"`,
+      score: candidate.score,
+      reason: `Similar a "${candidate.bestMatch.title}"`,
     });
   }
 
-  return { recommendations, coldStart: false };
+  return { recommendations, coldStart: false, rankedCandidateIds };
 }
