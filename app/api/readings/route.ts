@@ -85,9 +85,10 @@ export async function POST(request: Request) {
       },
     });
     await awardReadingPoints(tx, session.user.id, reading.id);
-    await checkAndUnlockAchievements(tx, session.user.id);
     return reading;
   });
+
+  await checkAndUnlockAchievements(prisma, session.user.id);
 
   return Response.json({ reading }, { status: 201 });
 }
