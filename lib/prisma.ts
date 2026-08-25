@@ -4,6 +4,7 @@ import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 
 neonConfig.webSocketConstructor = ws;
+neonConfig.poolQueryViaFetch = true;
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
