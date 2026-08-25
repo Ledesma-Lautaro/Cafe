@@ -9,11 +9,19 @@ import {
 } from "../lib/recommendations";
 
 const MIN_READINGS = 3;
-const strategy = (process.argv[2] as ProfileStrategy) ?? "maxSimilarity";
-const centered = process.argv[3] === "centered";
+const strategy = process.argv[2] as ProfileStrategy | undefined;
+const override = process.argv[3];
+const centered =
+  override === "centered"
+    ? true
+    : override === "uncentered"
+      ? false
+      : undefined;
 
 function intraListDiversity(vectors: number[][]): number {
-  if (vectors.length < 2) {return 0;}
+  if (vectors.length < 2) {
+    return 0;
+  }
 
   let sum = 0;
   let pairs = 0;
@@ -38,12 +46,13 @@ async function main() {
   const catalogSize = vectorById.size;
 
   const users = await prisma.user.findMany({
-    include: { readings: { select: { id: true, bookId: true } } },
+    include: { readings: { select: { id: true, bookId: true, rating: true } } },
   });
   const evaluable = users.filter((u) => u.readings.length >= MIN_READINGS);
 
   let hits = 0;
   let total = 0;
+  let skipped= 0;
   let reciprocalRankSum = 0;
   let percentileSum = 0;
   let diversitySum = 0;
@@ -56,6 +65,10 @@ async function main() {
     perUser[user.email] = { hits: 0, total: 0, percentile: 0 };
 
     for (const heldOut of user.readings) {
+      if (heldOut.rating !== null && heldOut.rating <= 2) {
+        skipped++
+        continue;
+      }
       const { recommendations, rankedCandidateIds } = await getRecommendations(
         user.id,
         {
@@ -92,12 +105,19 @@ async function main() {
   const recall = hits / total;
 
   console.log(`Catálogo: ${catalogSize} libros`);
-  console.log(`Estrategia: ${strategy}${centered ? " + centrado" : ""}`);
+  console.log(
+    `Estrategia: ${strategy ?? "default de producción"}  · centrado: ${
+      centered === undefined
+        ? "default de producción"
+        : centered
+          ? "sí (override)"
+          : "no (override)"
+    }`,
+  );
   console.log(
     `Usuarios evaluados: ${evaluable.length} (>= ${MIN_READINGS} lecturas)`,
   );
-  console.log(`Evaluaciones leave-one-out: ${total}\n`);
-
+console.log(`Evaluaciones leave-one-out: ${total} (excluidas ${skipped} con rating <= 2)\n`);
   console.log(
     `recall@${RECOMMENDATION_COUNT}: ${recall.toFixed(4)}  (${hits}/${total})`,
   );

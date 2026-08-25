@@ -7,13 +7,44 @@ export interface WikipediaPage {
 const UA = {
   "User-Agent": "cafe-portfolio/1.0 (https://github.com/Ledesma-Lautaro/Cafe)",
 };
-const BATCH_SIZE = 20;
 
-interface ApiPage {
-  title: string;
-  missing?: boolean;
-  extract?: string;
-  description?: string;
+const PLOT_SECTION = /argumento|sinopsis|trama|resumen|contenido/i;
+
+function parseSections(extract: string): {
+  intro: string;
+  plot: string | null;
+} {
+  const intro: string[] = [];
+  let plotLines: string[] | null = null;
+  let capturing = false;
+  let insideBody = false;
+
+  for (const line of extract.split("\n")) {
+    const heading = line.trim().match(/^==\s*([^=].*?)\s*==$/);
+
+    if (heading) {
+      if (capturing) {
+        break;
+      }
+      insideBody = true;
+      capturing = plotLines === null && PLOT_SECTION.test(heading[1]);
+      if (capturing) {
+        plotLines = [];
+      }
+      continue;
+    }
+
+    if (capturing && plotLines) {
+      plotLines.push(line);
+    } else if (!insideBody) {
+      intro.push(line);
+    }
+  }
+
+  return {
+    intro: intro.join(" ").trim(),
+    plot: plotLines ? plotLines.join(" ").trim() : null,
+  };
 }
 
 function normalize(text: string): string {
@@ -38,9 +69,42 @@ function mentionsAuthor(page: WikipediaPage, author: string): boolean {
   const words = normalize(author.split(",")[0])
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 4);
-  if (words.length === 0) {return false;}
+  if (words.length === 0) {
+    return false;
+  }
   const haystack = normalize(`${page.description ?? ""} ${page.extract}`);
   return words.some((w) => haystack.includes(w));
+}
+
+export async function fetchWikipediaArticle(title: string): Promise<{
+  title: string;
+  description?: string;
+  text: string;
+  intro: string;
+} | null> {
+  const url =
+    `https://es.wikipedia.org/w/api.php?action=query&format=json&formatversion=2` +
+    `&prop=extracts|description&explaintext=1&redirects=1` +
+    `&titles=${encodeURIComponent(title)}`;
+
+  const res = await fetch(url, { headers: UA });
+  if (!res.ok) {
+    return null;
+  }
+
+  const data = await res.json();
+  const page = data.query?.pages?.[0];
+  if (!page || page.missing || !page.extract) {
+    return null;
+  }
+
+  const { intro, plot } = parseSections(page.extract);
+  const text = plot || intro;
+  if (!text) {
+    return null;
+  }
+
+  return { title: page.title, description: page.description, text, intro };
 }
 
 export async function findWikipediaPage(
@@ -49,62 +113,29 @@ export async function findWikipediaPage(
 ): Promise<WikipediaPage | null> {
   const cleaned = cleanTitle(title);
   try {
-    const page = (await fetchWikipediaPages([cleaned])).get(cleaned);
-    if (!page) {return null;}
-    if (isDisambiguation(page)) {return null;}
-    if (!mentionsAuthor(page, author)) {return null;}
-    return page;
+    const article = await fetchWikipediaArticle(cleaned);
+    if (!article) {
+      return null;
+    }
+
+    const paraVerificar: WikipediaPage = {
+      title: article.title,
+      extract: article.intro,
+      description: article.description,
+    };
+    if (isDisambiguation(paraVerificar)) {
+      return null;
+    }
+    if (!mentionsAuthor(paraVerificar, author)) {
+      return null;
+    }
+
+    return {
+      title: article.title,
+      extract: article.text,
+      description: article.description,
+    };
   } catch {
     return null;
   }
-}
-
-export async function fetchWikipediaPages(
-  titles: string[],
-): Promise<Map<string, WikipediaPage>> {
-  const result = new Map<string, WikipediaPage>();
-
-  for (let i = 0; i < titles.length; i += BATCH_SIZE) {
-    const chunk = titles.slice(i, i + BATCH_SIZE);
-    const url =
-      `https://es.wikipedia.org/w/api.php?action=query&format=json&formatversion=2` +
-      `&prop=extracts|description&exintro=1&explaintext=1&exlimit=${BATCH_SIZE}&redirects=1` +
-      `&titles=${encodeURIComponent(chunk.join("|"))}`;
-
-    const res = await fetch(url, { headers: UA });
-    if (!res.ok) {
-      console.warn(
-        `Wikipedia respondió ${res.status} en el lote ${i / BATCH_SIZE + 1}`,
-      );
-      continue;
-    }
-
-    const data = await res.json();
-
-    const alias = new Map<string, string>();
-    for (const n of data.query?.normalized ?? []) {alias.set(n.from, n.to);}
-    for (const r of data.query?.redirects ?? []) {alias.set(r.from, r.to);}
-
-    const pages: ApiPage[] = data.query?.pages ?? [];
-    const byTitle = new Map(pages.map((p) => [p.title, p]));
-
-    for (const requested of chunk) {
-      let key = requested;
-      for (let hop = 0; hop < 3 && alias.has(key); hop++) {key = alias.get(key)!;}
-
-      const page = byTitle.get(key);
-      if (!page || page.missing || !page.extract) {continue;}
-
-      result.set(requested, {
-        title: page.title,
-        extract: page.extract,
-        description: page.description,
-      });
-    }
-
-    if (i + BATCH_SIZE < titles.length)
-      {await new Promise((r) => setTimeout(r, 1000));}
-  }
-
-  return result;
 }

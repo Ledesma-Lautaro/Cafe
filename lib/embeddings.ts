@@ -1,14 +1,23 @@
-import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers"
+import {
+  pipeline,
+  type FeatureExtractionPipeline,
+} from "@huggingface/transformers";
 import { prisma } from "@/lib/prisma";
 
-let extractorPromise: Promise <FeatureExtractionPipeline> | null = null;
+let extractorPromise = pipeline(
+  "feature-extraction",
+  "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+  { dtype: "q8" },
+);
 
 function normalize(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
 
 function truncateAtSentence(text: string, maxChars: number) {
-  if (text.length <= maxChars) {return text;}
+  if (text.length <= maxChars) {
+    return text;
+  }
   const cut = text.slice(0, maxChars);
   const lastStop = Math.max(
     cut.lastIndexOf(". "),
@@ -18,25 +27,23 @@ function truncateAtSentence(text: string, maxChars: number) {
   return lastStop > maxChars * 0.5 ? cut.slice(0, lastStop + 1) : cut;
 }
 
-function getExtractor(){
-    if(!extractorPromise) {
-        extractorPromise = pipeline(
-            "feature-extraction",
-            "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
-        )
-    }
-    return extractorPromise;
+function getExtractor() {
+  if (!extractorPromise) {
+    extractorPromise = pipeline(
+      "feature-extraction",
+      "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+    );
+  }
+  return extractorPromise;
 }
 
-export async function generateEmbedding(
-    text: string
-) : Promise<number[]>{
-    const extractor = await getExtractor();
-    const output = await extractor(text, {
-        pooling: "mean",
-        normalize: true
-    });
-    return Array.from(output.data as Float32Array);
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const extractor = await getExtractor();
+  const output = await extractor(text, {
+    pooling: "mean",
+    normalize: true,
+  });
+  return Array.from(output.data as Float32Array);
 }
 
 export function bookEmbeddingText(book: {

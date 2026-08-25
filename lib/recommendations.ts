@@ -47,8 +47,15 @@ function averageVectors(
   items: { embedding: number[]; weight: number }[],
 ): number[] {
   const dims = items[0].embedding.length;
-  const totalWeight = items.reduce((sum, i) => sum + i.weight, 0);
+  let totalWeight = items.reduce((sum, i) => sum + i.weight, 0);
+  let weights = items.map((i) => i.weight);
+
+  if (totalWeight === 0) {
+    weights = items.map(() => 1);
+    totalWeight = items.length;
+  }
   const result = new Array(dims).fill(0);
+
   for (const { embedding, weight } of items) {
     for (let i = 0; i < dims; i++) {
       result[i] += (embedding[i] * weight) / totalWeight;
@@ -57,9 +64,24 @@ function averageVectors(
   return result;
 }
 
-async function getPopularBooks(userId: string, limit: number): Promise<Recommendation[]> {
-   const rows = await prisma.$queryRaw<
-    { id: string; title: string; author: string; readers: number; avg_rating: number | null }[]
+function ratingWeight(rating: number | null): number {
+  if (rating === null) {
+    return 0.6;
+  }
+  return (rating - 1) / 4;
+}
+async function getPopularBooks(
+  userId: string,
+  limit: number,
+): Promise<Recommendation[]> {
+  const rows = await prisma.$queryRaw<
+    {
+      id: string;
+      title: string;
+      author: string;
+      readers: number;
+      avg_rating: number | null;
+    }[]
   >`
     SELECT b.id, b.title, b.author,
            COUNT(r.id)::int as readers,
@@ -89,7 +111,9 @@ async function getPopularBooks(userId: string, limit: number): Promise<Recommend
 
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
-  for (let i = 0; i < a.length; i++) {dot += a[i] * b[i];}
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+  }
   return dot;
 }
 
@@ -107,9 +131,9 @@ export async function getRecommendations(
   rankedCandidateIds: string[];
 }> {
   const limit = opts.limit ?? RECOMMENDATION_COUNT;
-  const strategy = opts.strategy ?? "centroid";
+  const strategy = opts.strategy ?? "maxSimilarity";
+  const centered = opts.centered ?? true;
   const excluded = new Set(opts.excludeReadingIds ?? []);
-  const centered = opts.centered ?? false;
 
   const allRead = await prisma.$queryRaw<ReadRow[]>`
     SELECT r.id as "readingId", b.id as "bookId", b.title,
@@ -120,7 +144,7 @@ export async function getRecommendations(
   `;
 
   const history = allRead.filter((row) => !excluded.has(row.readingId));
-   if (history.length === 0) {
+  if (history.length === 0) {
     return {
       recommendations: await getPopularBooks(userId, limit),
       coldStart: true,
@@ -128,15 +152,20 @@ export async function getRecommendations(
     };
   }
 
-    const candidates = await prisma.$queryRaw<CandidateRow[]>`
+  const candidates = await prisma.$queryRaw<CandidateRow[]>`
     SELECT id, title, author, embedding::text as embedding
     FROM "Book"
     WHERE embedding IS NOT NULL
   `;
 
-  const parsed = candidates.map((c) => ({ ...c, vector: parseVector(c.embedding) }));
+  const parsed = candidates.map((c) => ({
+    ...c,
+    vector: parseVector(c.embedding),
+  }));
 
-  const corpusMean = averageVectors(parsed.map((c) => ({ embedding: c.vector, weight: 1 })));
+  const corpusMean = averageVectors(
+    parsed.map((c) => ({ embedding: c.vector, weight: 1 })),
+  );
 
   const adjust = (v: number[]): number[] =>
     centered ? normalizeVector(v.map((x, i) => x - corpusMean[i])) : v;
@@ -145,7 +174,7 @@ export async function getRecommendations(
     bookId: row.bookId,
     title: row.title,
     embedding: adjust(parseVector(row.embedding)),
-    weight: row.rating ?? 3,
+    weight: ratingWeight(row.rating),
   }));
 
   const readBookIds = new Set(readVectors.map((r) => r.bookId));
@@ -158,16 +187,25 @@ export async function getRecommendations(
 
       let bestMatch = readVectors[0];
       let bestSimilarity = -Infinity;
+      let bestWeighted = -Infinity;
+
       for (const read of readVectors) {
         const similarity = cosineSimilarity(vector, read.embedding);
         if (similarity > bestSimilarity) {
           bestSimilarity = similarity;
+        }
+
+        const weighted = similarity * read.weight;
+        if (weighted > bestWeighted) {
+          bestWeighted = weighted;
           bestMatch = read;
         }
       }
 
       const score =
-        strategy === "maxSimilarity" ? bestSimilarity : cosineSimilarity(vector, userVector);
+        strategy === "maxSimilarity"
+          ? bestWeighted
+          : cosineSimilarity(vector, userVector);
 
       return { ...candidate, vector, bestMatch, bestSimilarity, score };
     })
@@ -179,8 +217,12 @@ export async function getRecommendations(
   const acceptedVectors: number[][] = [];
 
   for (const candidate of scored) {
-    if (recommendations.length >= limit) {break;}
-    if (candidate.bestSimilarity > SIMILARITY_THRESHOLD) {continue;}
+    if (recommendations.length >= limit) {
+      break;
+    }
+    if (candidate.bestSimilarity > SIMILARITY_THRESHOLD) {
+      continue;
+    }
     if (
       acceptedVectors.some(
         (v) => cosineSimilarity(candidate.vector, v) > SIMILARITY_THRESHOLD,
