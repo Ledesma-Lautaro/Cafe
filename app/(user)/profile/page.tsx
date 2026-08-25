@@ -3,6 +3,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { getUserStats } from "@/lib/achievements";
+import { SignOutButton } from "@/components/auth/SignOutButton";
+import { Suspense } from "react";
+import { Recommendations } from "@/components/reading/Recommendations";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -57,11 +60,24 @@ export default async function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-sm py-16">
-      <h1 className="text-2xl font-bold">Tu perfil</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Tu perfil</h1>
+        <SignOutButton />
+      </div>
       <p className="mt-4 text-sm text-gray-500">
         Miembro desde {user.createdAt.toLocaleDateString("es-AR")}
       </p>
       <ProfileForm initialName={user.name} email={user.email} />
+      <h2 className="mt-10 text-xl font-bold">Recomendado para vos</h2>
+      <Suspense
+        fallback={
+          <p className="mt-4 text-sm text-gray-500">
+            Buscando recomendaciones…
+          </p>
+        }
+      >
+        <Recommendations userId={session.user.id} />
+      </Suspense>
       <h2 className="mt-10 text-xl font-bold">Historial de compras</h2>
       <ul className="mt-4 flex flex-col gap-3">
         {purchases.map((purchase) => (
