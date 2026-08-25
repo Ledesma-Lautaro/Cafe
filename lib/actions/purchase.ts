@@ -38,9 +38,9 @@ export async function createPurchase(formData: FormData) {
       data: { ...parsed.data, amount: product.price },
     })
     await awardPurchasePoints(tx, parsed.data.userId, purchase.id, Number(product.price))
-    await checkAndUnlockAchievements(tx, parsed.data.userId);
   });
-
+  
+  await checkAndUnlockAchievements(prisma, parsed.data.userId);
   revalidatePath("/admin");
   revalidatePath("/profile");
 }
