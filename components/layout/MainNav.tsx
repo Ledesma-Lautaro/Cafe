@@ -15,8 +15,6 @@ function useVisibleItems(role: Role) {
   return ITEMS.filter((item) => !item.adminOnly || role === "ADMIN");
 }
 
-/** Un ítem está activo también en sus rutas hijas:
- *  /readings/new y /readings/[id]/edit marcan "Lecturas". */
 function useIsActive() {
   const pathname = usePathname();
   return (href: string) =>
@@ -38,7 +36,6 @@ export function MainNav({ role }: { role: Role }) {
             aria-current={active ? "page" : undefined}
             className="relative py-1 font-bold hover:text-ink-soft"
           >
-            {/* El trazo de marcador va detrás del texto, no debajo. */}
             {active && (
               <span
                 aria-hidden
@@ -91,8 +88,7 @@ export function MobileNav({ role }: { role: Role }) {
   );
 }
 
-/** El "+" flotante de tus referencias. Solo mobile: en desktop
- *  la misma acción vive como botón en el header. */
+
 export function NewReadingFab() {
   return (
     <Link
