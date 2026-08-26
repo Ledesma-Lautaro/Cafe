@@ -220,12 +220,16 @@ async function seedDemoReadings(booksByTheme: Record<string, string[]>) {
 
     profile.mix.forEach(({ theme, count, rating }) => {
       const pool = booksByTheme[theme] ?? [];
-      if (pool.length === 0) { return; }
+      if (pool.length === 0) {
+        return;
+      }
 
       let taken = 0;
       for (let i = 0; i < pool.length && taken < count; i++) {
         const bookId = pool[(i + profileIndex) % pool.length];
-        if (used.has(bookId)) { continue; }
+        if (used.has(bookId)) {
+          continue;
+        }
         used.add(bookId);
         picked.push({ bookId, rating });
         taken++;
@@ -303,7 +307,9 @@ async function generateMissingEmbeddings() {
 
   console.log(`Generando embeddings para ${pending.length} libros...`);
   for (const book of pending) {
-    const embedding = await generateEmbedding(bookEmbeddingText(book));
+    const embedding = await generateEmbedding(bookEmbeddingText(book), {
+      local: true,
+    });
     await saveBookEmbedding(book.id, embedding);
   }
 }

@@ -1,6 +1,10 @@
 import "./load-env";
 import { prisma } from "../lib/prisma";
-import { generateEmbedding, bookEmbeddingText, saveBookEmbedding } from "../lib/embeddings";
+import {
+  generateEmbedding,
+  bookEmbeddingText,
+  saveBookEmbedding,
+} from "../lib/embeddings";
 
 interface BookRow {
   id: string;
@@ -17,7 +21,9 @@ async function main() {
 
   console.log(`Regenerando embeddings de ${books.length} libros...`);
   for (const book of books) {
-    const embedding = await generateEmbedding(bookEmbeddingText(book));
+    const embedding = await generateEmbedding(bookEmbeddingText(book), {
+      local: true,
+    });
     await saveBookEmbedding(book.id, embedding);
   }
   console.log("Listo.");
