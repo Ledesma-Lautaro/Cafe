@@ -1,8 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { TextField } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 
-export function ProfileForm({ initialName, email }: { initialName: string | null; email: string }) {
+export function ProfileForm({
+  initialName,
+  email,
+}: {
+  initialName: string | null;
+  email: string;
+}) {
   const [name, setName] = useState(initialName ?? "");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -20,42 +29,43 @@ export function ProfileForm({ initialName, email }: { initialName: string | null
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-
       if (!res.ok) {
-        setError("No se pudo actualizar el perfil");
+        setError("No se pudo actualizar el perfil.");
         return;
       }
-
       setSuccess(true);
+    } catch {
+      setError("No se pudo conectar con el servidor. Intentá de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="email">Email</label>
-        <input id="email" type="email" value={email} disabled className="rounded border bg-gray-100 px-3 py-2" />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="name">Nombre</label>
-        <input
-          id="name"
-          type="text"
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextField
+          id="profile-email"
+          label="Email"
+          type="email"
+          value={email}
+          disabled
+          hint="El email no se puede cambiar."
+        />
+        <TextField
+          id="profile-name"
+          label="Nombre"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded border px-3 py-2"
         />
       </div>
 
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-green-600">Guardado.</p>}
+      {error && <Alert tone="error">{error}</Alert>}
+      {success && <Alert tone="success">Perfil actualizado.</Alert>}
 
-      <button type="submit" disabled={isSubmitting} className="rounded bg-black px-4 py-2 text-white disabled:opacity-50">
-        {isSubmitting ? "Guardando..." : "Guardar cambios"}
-      </button>
+      <Button type="submit" isLoading={isSubmitting} className="self-start">
+        {isSubmitting ? "Guardando…" : "Guardar cambios"}
+      </Button>
     </form>
   );
 }

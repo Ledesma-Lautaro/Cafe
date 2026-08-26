@@ -1,20 +1,19 @@
-import { redirect, notFound } from "next/navigation";
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { EditReadingForm } from "@/components/reading/EditReadingForm";
+import Link from "next/link";
+import { BookX } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { buttonClasses } from "@/components/ui/Button";
 
-export default async function EditReadingPage(
-  props: PageProps<"/readings/[id]/edit">,
-) {
-  const session = await auth();
-  if (!session?.user) {redirect("/login");}
-
-  const { id } = await props.params;
-  const reading = await prisma.reading.findUnique({
-    where: { id, userId: session.user.id },
-  });
-
-  if (!reading) {notFound();}
-
-  return <EditReadingForm reading={reading} />;
+export default function ReadingNotFound() {
+  return (
+    <EmptyState
+      icon={BookX}
+      title="Esa lectura no existe"
+      description="Puede que la hayas eliminado, o que el enlace apunte a la lectura de otra persona."
+      action={
+        <Link href="/readings" className={buttonClasses()}>
+          Volver a mis lecturas
+        </Link>
+      }
+    />
+  );
 }

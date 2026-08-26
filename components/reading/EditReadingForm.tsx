@@ -1,21 +1,21 @@
 "use client";
+
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { TextField, TextAreaField, SelectField } from "@/components/ui/Field";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 
 export function EditReadingForm({
   reading,
 }: {
-  reading: {
-    id: string;
-    date: Date;
-    rating: number | null;
-    comment: string | null;
-  };
+  reading: { id: string; date: Date; rating: number | null; comment: string | null };
 }) {
   const router = useRouter();
   const [date, setDate] = useState(reading.date.toISOString().split("T")[0]);
   const [rating, setRating] = useState(reading.rating?.toString() ?? "");
-  const [comment, setComment] = useState(reading.comment?.toString() ?? "");
+  const [comment, setComment] = useState(reading.comment ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,70 +35,65 @@ export function EditReadingForm({
         }),
       });
       if (!res.ok) {
-        setError("No se pudo guardar los cambios");
+        setError("No se pudieron guardar los cambios. Intentá de nuevo.");
         return;
       }
       router.push("/readings");
+    } catch {
+      setError("No se pudo conectar con el servidor. Intentá de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-    return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-        <h1 className="text-2xl font-bold">Editar lectura</h1>
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="text-title">Editar lectura</h1>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="date">Fecha</label>
-          <input
-            id="date"
-            type="date"
-            required
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="rating">Puntaje (1-5, opcional)</label>
-          <input
-            id="rating"
-            type="number"
-            min={1}
-            max={5}
-            value={rating}
-            onChange={(e) => setRating(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="comment">Comentario (opcional)</label>
-          <textarea
-            id="comment"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </div>
-
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <TextField
+          id="date"
+          label="Fecha de lectura"
+          type="date"
+          required
+          max={new Date().toISOString().split("T")[0]}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+        <SelectField
+          id="rating"
+          label="Puntaje"
+          hint="Opcional. Influye en tus recomendaciones."
+          value={rating}
+          onChange={(e) => setRating(e.target.value)}
         >
-          {isSubmitting ? "Guardando..." : "Guardar cambios"}
-        </button>
+          <option value="">Sin puntaje</option>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <option key={n} value={n}>
+              {"★".repeat(n)} ({n}/5)
+            </option>
+          ))}
+        </SelectField>
+        <TextAreaField
+          id="comment"
+          label="Comentario"
+          hint="Opcional."
+          rows={3}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+
+        {error && <Alert tone="error">{error}</Alert>}
+
+        <div className="flex gap-2">
+          <Button type="submit" isLoading={isSubmitting}>
+            {isSubmitting ? "Guardando…" : "Guardar cambios"}
+          </Button>
+          <Link href="/readings" className={buttonClasses({ variant: "ghost" })}>
+            Cancelar
+          </Link>
+        </div>
       </form>
     </div>
   );
 }
-

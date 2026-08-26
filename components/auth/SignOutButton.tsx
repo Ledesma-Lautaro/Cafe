@@ -1,4 +1,5 @@
 import { signOut } from "@/auth";
+import { LogOut } from "lucide-react";
 
 export function SignOutButton() {
   return (
@@ -8,10 +9,14 @@ export function SignOutButton() {
         await signOut({ redirectTo: "/login" });
       }}
     >
-      <button type="submit" className="text-sm text-gray-600 underline">
-        Cerrar sesión
+      <button
+        type="submit"
+        className="flex size-8 items-center justify-center rounded-brutal border-2 border-ink bg-surface text-ink hover:bg-coral hover:text-on-accent"
+        aria-label="Cerrar sesión"
+        title="Cerrar sesión"
+      >
+        <LogOut size={15} strokeWidth={2.5} />
       </button>
     </form>
   );
-
 }

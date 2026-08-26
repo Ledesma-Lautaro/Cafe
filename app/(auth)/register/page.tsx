@@ -1,24 +1,44 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { TextField } from "@/components/ui/Field";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { Card } from "@/components/ui/Card";
+
+type FieldErrors = { email?: string; password?: string; name?: string };
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!success) {
+      return;
+    }
+    const timeout = setTimeout(() => router.push("/login"), 3000);
+    return () => clearTimeout(timeout);
+  }, [success, router]);
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
     setIsSubmitting(true);
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password}),
+        body: JSON.stringify({ email, password, name: name || undefined }),
       });
 
       if (res.ok) {
@@ -27,20 +47,21 @@ export default function RegisterPage() {
       }
 
       const data = await res.json();
+
       if (res.status === 409) {
-        setError(data.error as string);
+        setFieldErrors({ email: "Ya existe una cuenta con ese email." });
       } else if (res.status === 400) {
-        setError(
-          "Revisa los datos ingresados: " +
-            JSON.stringify(data.error.fieldErrors),
-        );
+        const zod = data.error?.fieldErrors ?? {};
+        setFieldErrors({
+          email: zod.email ? "Ingresá un email válido." : undefined,
+          password: zod.password ? "La contraseña necesita al menos 8 caracteres." : undefined,
+          name: zod.name ? "El nombre no puede estar vacío." : undefined,
+        });
       } else {
-        setError("Ocurrió un error inesperado. Intente de nuevo más tarde.");
+        setError("Ocurrió un error inesperado. Intentá de nuevo más tarde.");
       }
     } catch {
-      setError(
-        "No se pudo conectar con el servidor. Intente de nuevo más tarde.",
-      );
+      setError("No se pudo conectar con el servidor. Intentá de nuevo más tarde.");
     } finally {
       setIsSubmitting(false);
     }
@@ -48,56 +69,66 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <h1 className="text-2xl font-bold mb-4">Registro exitoso</h1>
-      <p>Ahora podés iniciar sesión con tu cuenta.</p>
-    </div>
-    ) 
+      <Card className="flex flex-col gap-4">
+        <h1 className="text-title">Cuenta creada</h1>
+        <Alert tone="success">Ya podés iniciar sesión. Te llevamos en unos segundos…</Alert>
+        <Link href="/login" className={buttonClasses({ className: "w-full" })}>
+          Ir a iniciar sesión
+        </Link>
+      </Card>
+    );
   }
-  return (
-  <div className="flex flex-col items-center justify-center min-h-screen">
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <h1 className="text-2xl font-bold">Crear cuenta</h1>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="email">Email</label>
-        <input
+  return (
+    <Card className="flex flex-col gap-5">
+      <h1 className="text-title">Crear cuenta</h1>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <TextField
+          id="name"
+          label="Nombre"
+          hint="Opcional. Es el nombre que se muestra en tu perfil."
+          autoComplete="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={fieldErrors.name}
+        />
+        <TextField
           id="email"
+          label="Email"
           type="email"
           required
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded border px-3 py-2"
+          error={fieldErrors.email}
         />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="password">Contraseña</label>
-        <input
+        <TextField
           id="password"
+          label="Contraseña"
           type="password"
           required
           minLength={8}
+          autoComplete="new-password"
+          hint="Al menos 8 caracteres."
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded border px-3 py-2"
+          error={fieldErrors.password}
         />
-      </div>
 
-      {error && (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      )}
+        {error && <Alert tone="error">{error}</Alert>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-      >
-        {isSubmitting ? "Creando cuenta..." : "Crear cuenta"}
-      </button>
-    </form>
-  </div>
-);
+        <Button type="submit" isLoading={isSubmitting} className="w-full">
+          {isSubmitting ? "Creando cuenta…" : "Crear cuenta"}
+        </Button>
+      </form>
+
+      <p className="text-sm text-ink-soft">
+        ¿Ya tenés cuenta?{" "}
+        <Link href="/login" className="font-bold text-ink underline">
+          Ingresá
+        </Link>
+      </p>
+    </Card>
+  );
 }

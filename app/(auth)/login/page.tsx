@@ -3,6 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
+import { TextField } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { Card } from "@/components/ui/Card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,68 +22,56 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const res = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+      const res = await signIn("credentials", { email, password, redirect: false });
       if (res?.error) {
-        setError("Credenciales inválidas. Intente de nuevo.");
+        setError("Email o contraseña incorrectos.");
         return;
       }
-
-      router.push("/profile");
+      router.push("/readings");
+    } catch {
+      setError("No se pudo conectar con el servidor. Intentá de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <form
-        onSubmit={handleSubmit}
-        className="flex w-full max-w-sm flex-col gap-4"
-      >
-        <h1 className="text-2xl font-bold">Iniciar sesión</h1>
+    <Card className="flex flex-col gap-5">
+      <h1 className="text-title">Iniciar sesión</h1>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <TextField
+          id="email"
+          label="Email"
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <TextField
+          id="password"
+          label="Contraseña"
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="password">Contraseña</label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </div>
+        {error && <Alert tone="error">{error}</Alert>}
 
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-        >
-          {isSubmitting ? "Ingresando..." : "Ingresar"}
-        </button>
+        <Button type="submit" isLoading={isSubmitting} className="w-full">
+          {isSubmitting ? "Ingresando…" : "Ingresar"}
+        </Button>
       </form>
-    </div>
+
+      <p className="text-sm text-ink-soft">
+        ¿No tenés cuenta?{" "}
+        <Link href="/register" className="font-bold text-ink underline">
+          Creá una
+        </Link>
+      </p>
+    </Card>
   );
 }
