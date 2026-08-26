@@ -13,11 +13,6 @@ semánticos.
 | ![Portada](docs/screenshots/landing.png) | ![Perfil en modo oscuro](docs/screenshots/profile.png) |
 | ![Recomendaciones](docs/screenshots/recommendation.png) | ![Estadísticas](docs/screenshots/stats.png) |
 
-| | |
-|---|---|
-| ![Portada](docs/screenshots/landing.png) | ![Perfil en modo oscuro](docs/screenshots/perfil-oscuro.png) |
-| ![Recomendaciones](docs/screenshots/recomendaciones.png) | ![Estadísticas](docs/screenshots/stats.png) |
-
 ---
 
 ## Stack

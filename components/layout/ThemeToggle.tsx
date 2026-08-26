@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
 
 type Theme = "light" | "system" | "dark";
@@ -11,34 +11,46 @@ const OPTIONS = [
   { value: "dark", label: "Tema oscuro", Icon: Moon },
 ] as const;
 
-export function ThemeToggle() {
-  // Arranca en null: el servidor no puede saber la preferencia guardada.
-  // Leerla en el render inicial rompería la hidratación.
-  const [theme, setTheme] = useState<Theme | null>(null);
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    const applied = document.documentElement.dataset.theme;
-    setTheme(applied === "light" || applied === "dark" ? applied : "system");
-  }, []);
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
-  function apply(next: Theme) {
-    setTheme(next);
-    const root = document.documentElement;
-    if (next === "system") {
-      delete root.dataset.theme;
-    } else {
-      root.dataset.theme = next;
-    }
-    try {
-      if (next === "system") {
-        localStorage.removeItem("theme");
-      } else {
-        localStorage.setItem("theme", next);
-      }
-    } catch {
-      // Sin persistencia: el tema igual se aplica en esta sesión.
-    }
+function getSnapshot(): Theme {
+  const applied = document.documentElement.getAttribute("data-theme");
+  return applied === "light" || applied === "dark" ? applied : "system";
+}
+
+function getServerSnapshot(): Theme {
+  return "system";
+}
+
+function applyTheme(next: Theme) {
+  const root = document.documentElement;
+
+  if (next === "system") {
+    root.removeAttribute("data-theme");
+  } else {
+    root.setAttribute("data-theme", next);
   }
+  try {
+    if (next === "system") {
+      localStorage.removeItem("theme");
+    } else {
+      localStorage.setItem("theme", next);
+    }
+  } catch {}
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+export function ThemeToggle() {
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   return (
     <div
@@ -50,7 +62,7 @@ export function ThemeToggle() {
         <button
           key={value}
           type="button"
-          onClick={() => apply(value)}
+          onClick={() => applyTheme(value)}
           aria-pressed={theme === value}
           aria-label={label}
           title={label}

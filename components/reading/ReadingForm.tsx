@@ -49,7 +49,6 @@ export function ReadingForm() {
       return;
     }
     if (!query) {
-      setResults([]);
       return;
     }
     let cancelled = false;
@@ -199,7 +198,7 @@ export function ReadingForm() {
             </p>
           )}
           {searchError && <Alert tone="error">{searchError}</Alert>}
-          {results.length > 0 && (
+          {query && results.length > 0 && (
             <ul className="flex flex-col overflow-hidden rounded-brutal border-2 border-ink bg-surface">
               {results.map((result, i) => (
                 <li

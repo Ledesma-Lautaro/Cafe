@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { BookOpen, Coffee, Sparkles, Trophy } from "lucide-react";
+import { BookOpen, Coffee, Sparkles } from "lucide-react";
 import { auth } from "@/auth";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { buttonClasses } from "@/components/ui/Button";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Logo } from "@/components/layout/Logo";
 
 const STEPS = [

@@ -56,11 +56,12 @@ function averageVectors(
   }
   const result = new Array(dims).fill(0);
 
-  for (const { embedding, weight } of items) {
+  items.forEach(({ embedding }, index) => {
+    const weight = weights[index];
     for (let i = 0; i < dims; i++) {
       result[i] += (embedding[i] * weight) / totalWeight;
     }
-  }
+  });
   return result;
 }
 
