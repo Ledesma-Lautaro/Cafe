@@ -8,6 +8,10 @@ semánticos.
 🔗 **Demo:**(https://cafe-r71e.onrender.com)
 
 > Proyecto de portfolio desarrollado en solitario, organizado en 7 sprints.
+| | |
+|---|---|
+| ![Portada](docs/screenshots/landing.png) | ![Perfil en modo oscuro](docs/screenshots/profile.png) |
+| ![Recomendaciones](docs/screenshots/recommendation.png) | ![Estadísticas](docs/screenshots/stats.png) |
 
 ---
 
