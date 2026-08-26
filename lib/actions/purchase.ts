@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma, withRetry } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { awardPurchasePoints } from "../points";
 import { checkAndUnlockAchievements } from "../achievements";
@@ -29,18 +29,28 @@ export async function createPurchase(formData: FormData) {
     throw new Error("Datos inválidos");
   }
 
-  const product = await prisma.product.findUniqueOrThrow({
-    where: { id: parsed.data.productId },
-  });
+  const product = await withRetry(() =>
+    prisma.product.findUniqueOrThrow({
+      where: { id: parsed.data.productId },
+    }),
+  );
 
-  await prisma.$transaction(async (tx) => {
-    const purchase = await tx.purchase.create({
-      data: { ...parsed.data, amount: product.price },
-    })
-    await awardPurchasePoints(tx, parsed.data.userId, purchase.id, Number(product.price))
-  });
-  
-  await checkAndUnlockAchievements(prisma, parsed.data.userId);
+  await withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.create({
+        data: { ...parsed.data, amount: product.price },
+      });
+      await awardPurchasePoints(
+        tx,
+        parsed.data.userId,
+        purchase.id,
+        Number(product.price),
+      );
+    }),
+  );
+
+  await withRetry(() => checkAndUnlockAchievements(prisma, parsed.data.userId));
+
   revalidatePath("/admin");
   revalidatePath("/profile");
 }

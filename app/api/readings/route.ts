@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma, withRetry } from "@/lib/prisma";
 import { awardReadingPoints } from "@/lib/points";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import {
@@ -9,6 +9,7 @@ import {
   bookEmbeddingText,
 } from "@/lib/embeddings";
 import { findWikipediaPage } from "@/lib/wikipedia";
+
 
 const createReadingSchema = z.object({
   title: z.string().trim().min(1, "El titulo es requerido"),
@@ -74,19 +75,21 @@ export async function POST(request: Request) {
       );
     }
   }
-  const reading = await prisma.$transaction(async (tx) => {
-    const reading = await tx.reading.create({
-      data: {
-        userId: session.user.id,
-        bookId: book.id,
-        date: parsed.data.date,
-        rating: parsed.data.rating,
-        comment: parsed.data.comment,
-      },
-    });
-    await awardReadingPoints(tx, session.user.id, reading.id);
-    return reading;
-  });
+  const reading = await withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const reading = await tx.reading.create({
+        data: {
+          userId: session.user.id,
+          bookId: book.id,
+          date: parsed.data.date,
+          rating: parsed.data.rating,
+          comment: parsed.data.comment,
+        },
+      });
+      await awardReadingPoints(tx, session.user.id, reading.id);
+      return reading;
+    }),
+  );
 
   await checkAndUnlockAchievements(prisma, session.user.id);
 
