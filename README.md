@@ -8,6 +8,10 @@ semánticos.
 🔗 **[Ver la demo](https://cafe-r71e.onrender.com)** · usuario `ana@demo.com`, contraseña `demo1234`
 
 > Proyecto de portfolio desarrollado en solitario, organizado en 7 sprints.
+| | |
+|---|---|
+| ![Portada](docs/screenshots/landing.png) | ![Perfil en modo oscuro](docs/screenshots/profile.png) |
+| ![Recomendaciones](docs/screenshots/recommendation.png) | ![Estadísticas](docs/screenshots/stats.png) |
 
 | | |
 |---|---|
