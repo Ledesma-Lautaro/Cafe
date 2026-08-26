@@ -1,13 +1,18 @@
-# Cafetería/Biblioteca
+# SOLAPA
 
 Aplicación web para una cafetería que funciona también como biblioteca. Cada usuario tiene un
 perfil donde registra sus lecturas, acumula puntos por consumo y lectura, desbloquea logros con
 recompensas, y recibe **recomendaciones de libros personalizadas** generadas con embeddings
 semánticos.
 
-🔗 **Demo:**(https://cafe-r71e.onrender.com)
+🔗 **[Ver la demo](https://cafe-r71e.onrender.com)** · usuario `ana@demo.com`, contraseña `demo1234`
 
 > Proyecto de portfolio desarrollado en solitario, organizado en 7 sprints.
+
+| | |
+|---|---|
+| ![Portada](docs/screenshots/landing.png) | ![Perfil en modo oscuro](docs/screenshots/perfil-oscuro.png) |
+| ![Recomendaciones](docs/screenshots/recomendaciones.png) | ![Estadísticas](docs/screenshots/stats.png) |
 
 ---
 
@@ -16,7 +21,8 @@ semánticos.
 | Capa | Tecnología |
 |---|---|
 | Framework | Next.js 16 (App Router), React 19, TypeScript |
-| Estilos | Tailwind CSS 4 |
+| Estilos | Tailwind CSS 4 con sistema de tokens propio |
+| Iconos | lucide-react |
 | Base de datos | Neon (Postgres serverless) + extensión `pgvector` |
 | ORM | Prisma 7 con driver adapter de Neon |
 | Autenticación | Auth.js v5 — Credentials + sesión JWT, passwords con bcrypt |
@@ -34,6 +40,10 @@ semánticos.
 - **Sistema de puntos y logros** que se desbloquean automáticamente al cumplir condiciones
 - **Recomendador de lecturas** por similitud semántica *(ver más abajo)*
 - **Perfil** con historial de compras, puntos, progreso de logros y recomendaciones
+- **Estadísticas públicas** con los libros más leídos, los productos más comprados y los
+  lectores con más puntos, cacheadas cada 5 minutos
+- **Interfaz con sistema de diseño propio**, modo claro/oscuro y contraste verificado
+  *(ver más abajo)*
 
 ---
 
@@ -83,6 +93,10 @@ diversidad  0.6872
 El libro oculto entra en el top-5 en el **56% de los casos** y queda, en promedio, dentro del
 **primer quinto** del ranking.
 
+Las lecturas ocultas con valoración ≤ 2 se **excluyen** de la evaluación: pedirle al sistema que
+prediga un libro que al usuario le disgustó es medir al revés. Al aplicar el filtro el numerador
+no cambió (26 aciertos sobre 59 y sobre 52), lo que confirma que esas 7 eran todas fallos.
+
 ### El recorrido: qué se probó y qué se midió
 
 Cada mejora se midió contra el baseline anterior antes de adoptarse.
@@ -93,10 +107,13 @@ Cada mejora se midió contra el baseline anterior antes de adoptarse.
 | Sinopsis de Wikipedia en vez de Google Books | 0.3390 | 0.2531 | 0.2449 |
 | Centrado de embeddings (corrección de *hubness*) | 0.4746 | 0.2938 | 0.1780 |
 | Sección "Argumento" en vez de la introducción | 0.5424 | 0.3684 | 0.1874 |
+| *— cambio de datos: valoraciones realistas y métrica corregida —* | | | |
+| Punto de partida del nuevo tramo | 0.5000 | 0.3481 | 0.2134 |
 | Ponderación por valoración del usuario | 0.5385 | 0.3974 | 0.1923 |
+| **Configuración final** (53 libros, fp32 vía API) | **0.5556** | **0.3725** | **0.1847** |
 
-*(los dos últimos tramos se midieron sobre un conjunto de datos distinto, tras corregir la
-métrica, por lo que no son comparables en términos absolutos con los anteriores)*
+Los tramos separados por esa línea **no son comparables entre sí**: cambió el conjunto de
+lecturas y la definición de la métrica. Dentro de cada tramo sí lo son.
 
 **Hallazgos que explican cada salto:**
 
@@ -142,19 +159,86 @@ parte del trabajo.
 
 ---
 
+## Interfaz
+
+El lenguaje visual es **neobrutalista**: bordes negros de 2 px, sombras duras sin desenfoque,
+color plano y tipografía pesada. Los elementos interactivos responden con física — los botones
+se hunden hacia su sombra al presionarlos, las tarjetas se levantan al pasarles el cursor.
+
+### Tokens y temas
+
+Los colores se definen una sola vez con `light-dark()`, que resuelve según la propiedad
+`color-scheme` del documento:
+
+```css
+--ink:        light-dark(#16130F, #F5EDE0);
+--ink-shadow: light-dark(#16130F, #B5A896);
+```
+
+Esto evita duplicar la paleta bajo un `@media (prefers-color-scheme)`, y reduce el selector de
+tema manual a cambiar `color-scheme` en la raíz. Como efecto secundario, los controles nativos
+—`select`, selector de fecha, barras de desplazamiento— siguen el tema sin una línea de CSS, lo
+que importa en una aplicación tan cargada de formularios.
+
+En modo oscuro la sombra **no** usa el mismo color que el borde: las formas claras sobre fondo
+oscuro se perciben más grandes, y una sombra crema a plena luminosidad se comía la composición.
+Va un tono más apagado, para que el ojo lea contorno y desplazamiento como dos capas.
+
+### El contraste se midió, no se estimó
+
+Antes de adoptar la paleta se calculó el ratio WCAG de cada par. Dos colores que parecían
+utilizables no lo eran:
+
+| Par | Ratio | |
+|---|---|---|
+| `--coral` sobre papel claro | 2.61 | ✗ |
+| `--leaf` sobre papel claro | 3.21 | ✗ |
+| `--danger-text` sobre papel claro | 6.59 | ✓ AA |
+| `--success-text` sobre papel claro | 5.52 | ✓ AA |
+
+De ahí una regla del sistema: **los acentos van de fondo con tinta oscura encima, nunca como
+color de texto**. Los mensajes de estado usan tokens propios.
+
+### Accesibilidad
+
+- `TextField` cablea `aria-invalid` y `aria-describedby` por su cuenta, de modo que un campo en
+  error no puede quedar sin anunciar por olvido.
+- Los errores se marcan con **borde, fondo y texto** — el color no es el único portador de la
+  información.
+- `role="alert"` para lo que bloquea, `role="status"` para lo que informa.
+- Anillo de foco visible con `:focus-visible`, barras de progreso con `aria-valuenow`, y respeto
+  por `prefers-reduced-motion`.
+- Borrar una lectura pide confirmación en línea, nombrando el libro: es irreversible.
+
+### Estados
+
+Cada ruta tiene esqueletos de carga con la forma del contenido final (para que no salte el
+layout), pantallas de error con reintento real, y 404 propios. El reintento importa acá en
+concreto: Neon suspende el compute por inactividad, y `error.tsx` usa la prop `retry` de
+Next 16 —que vuelve a pedir los datos— en lugar de `reset`, que solo re-renderiza.
+
+---
+
 ## Estructura del proyecto
 
 ```
 app/
+  (public)/                           landing y estadísticas — sin sesión
+    page.tsx                          portada
+    stats/                            rankings agregados
   (auth)/login · (auth)/register      formularios de autenticación
-  (user)/profile                      perfil, compras, logros y recomendaciones
-  (user)/readings                     listado con filtros por año y autor
-  (user)/readings/new                 alta con buscador de Google Books
-  (user)/readings/[id]/edit           edición de una lectura
-  admin/                              panel de carga de compras (solo ADMIN)
+  (user)/                             requiere sesión (ver proxy.ts)
+    profile/                          perfil, logros, compras y recomendaciones
+    readings/                         listado con filtros por año y autor
+    readings/new · readings/[id]/edit alta y edición
+    admin/                            panel de carga de compras (solo ADMIN)
   api/                                endpoints HTTP
+  error.tsx · not-found.tsx           estados globales
+  icon.svg · opengraph-image.tsx      metadata generada
 
 components/
+  ui/                                 sistema de diseño (Card, Button, Field, Badge…)
+  layout/                             navegación, selector de tema, logo
   auth/ · profile/ · reading/         componentes por dominio
 
 lib/
@@ -163,6 +247,7 @@ lib/
   achievements.ts                     evaluación y desbloqueo de logros
   recommendations.ts                  lógica del recomendador
   embeddings.ts                       generación de vectores (local o vía API)
+  stats.ts                            consultas agregadas de /stats
   wikipedia.ts · google-books.ts      fuentes de metadatos
   actions/                            Server Actions
 
@@ -176,6 +261,16 @@ direccionable desde afuera (endpoint de recomendaciones, handlers de Auth.js, pr
 Books), y una Server Action cuando es una mutación pegada a la propia interfaz sin consumidores
 externos (borrar una lectura, cargar una compra). Cada Server Action verifica permisos por su
 cuenta: es un endpoint en sí misma y no hereda la protección de la página que la invoca.
+
+**Route groups:** los paréntesis agrupan rutas sin afectar la URL. `(public)` y `(user)` tienen
+layouts distintos —uno con cabecera de sitio, otro con navegación de aplicación— pero
+`(user)/admin` sigue respondiendo en `/admin`.
+
+**Qué va dentro de una transacción:** lo que comparte un invariante va adentro (crear una lectura
+y sus puntos: una sin la otra es estado corrupto); lo derivado y recomputable va afuera
+(`checkAndUnlockAchievements`, que recalcula desde cero y es idempotente). No es una preferencia
+estética: con la evaluación de logros adentro, la transacción hacía ~8 viajes secuenciales a la
+base y superaba el timeout de 5 s de Prisma en producción.
 
 ---
 
@@ -203,9 +298,15 @@ Copiar `.env.example` a `.env.local` y completar:
 DATABASE_URL="postgresql://..."           # conexión pooled de Neon
 DATABASE_URL_UNPOOLED="postgresql://..."  # conexión directa, para migraciones
 AUTH_SECRET=""                            # generar con: npx auth secret
+AUTH_TRUST_HOST=true                      # obligatoria detrás de un proxy (Render)
 GOOGLE_BOOKS_API_KEY=""                   # console.cloud.google.com → habilitar "Books API"
 HUGGINGFACE_API_KEY=""                    # opcional: sin esta variable usa el modelo local
+NEXT_PUBLIC_SITE_URL=""                   # URL pública; sin ella las tarjetas de compartir
+                                          # apuntan a localhost
 ```
+
+Las variables van en `.env.local` (convención de Next). `prisma.config.ts` las carga
+explícitamente con `dotenv` apuntando a ese archivo.
 
 ### 4. Migraciones y datos de ejemplo
 
@@ -233,7 +334,32 @@ npm run dev
 npx prisma studio                              # inspeccionar la base de datos
 npx tsx scripts/rebuild-embeddings.ts          # regenerar todos los embeddings
 npx tsx scripts/evaluate-recommender.ts        # correr el harness de evaluación
+npx tsc --noEmit && npm run lint               # verificación
 ```
+
+El harness sin argumentos mide **la configuración real de producción**. Acepta overrides para
+comparar variantes: `npx tsx scripts/evaluate-recommender.ts centroid uncentered`.
+
+---
+
+## Deploy
+
+Desplegado en **Render**, tier gratuito:
+
+| Campo | Valor |
+|---|---|
+| Build Command | `npm install && npm run build` |
+| Start Command | `npm start` |
+
+`package.json` incluye `"postinstall": "prisma generate"`, imprescindible: `app/generated/` está
+en `.gitignore` y sin el cliente el build falla.
+
+Variables en el panel de Render: `DATABASE_URL`, `AUTH_SECRET` (distinto al de desarrollo),
+`AUTH_TRUST_HOST=true`, `GOOGLE_BOOKS_API_KEY`, `HUGGINGFACE_API_KEY` y `NEXT_PUBLIC_SITE_URL`.
+
+`AUTH_TRUST_HOST=true` no es opcional: Auth.js confía en el host automáticamente solo en Vercel
+y Netlify. Sin esa variable la aplicación levanta bien pero **el login falla con
+`UntrustedHost`**, un síntoma difícil de asociar con la causa.
 
 ---
 
@@ -254,12 +380,18 @@ entre corridas.
 **La inferencia corre fuera del servidor en producción.** El paquete de transformers pesa
 ~497 MB y no entra en la memoria del contenedor de despliegue. Se usa la Inference API de
 HuggingFace **con el mismo modelo**, de modo que los vectores siguen siendo compatibles y las
-mediciones conservan validez. En desarrollo, sin `HUGGINGFACE_API_KEY`, el modelo corre local.
+mediciones conservan validez (coseno 0.9967 entre local y API; la diferencia venía de la
+cuantización). En desarrollo, sin `HUGGINGFACE_API_KEY`, el modelo corre local.
 
 **El catálogo no se agrandó más allá de ~50 libros.** Se evaluó llevarlo a 150-200 usando
 categorías de Wikipedia, y se descartó: bajaría el `recall@5` por el aumento de distractores sin
 aportar metodología, y los volcados de categorías sesgan hacia libros oscuros con artículos
 mínimos, que degradarían la calidad de las representaciones.
+
+**Se descartaron dos fuentes de datos después de verificarlas.** Open Library: 4 de 6 ISBNs
+españoles dan 404, y buscar por título en español cae en registros vacíos, con lo que solo el
+27% del catálogo obtenía datos útiles. El `averageRating` de Google Books: cobertura 5 de 8 y
+conteos de 1 a 9 votos (*Cien años de soledad* puntúa 3/5 con 2 votos). Ruido muestral, no señal.
 
 ---
 
@@ -272,6 +404,11 @@ mínimos, que degradarían la calidad de las representaciones.
   generada. Puede resultar poco intuitivo en algunos casos.
 - El **catálogo es colaborativo y sin moderación**: cualquier usuario registrado puede agregar
   libros, y esos libros afectan las recomendaciones de todos.
+- Los **rankings de `/stats` son públicos y muestran nombres de usuario**. Se usa `name` con
+  fallback a "Lector anónimo" y nunca el email, pero en un producto real aparecer en el ranking
+  debería ser opcional y consentido.
+- **Desarrollo y producción comparten la misma base de datos.** Lo correcto sería un branch de
+  Neon para separarlas.
 - La demo corre en tiers gratuitos que **suspenden por inactividad**. La primera visita después
   de un rato puede tardar hasta un minuto, y ocasionalmente fallar una vez antes de responder.
   No es un problema de la aplicación sino del entorno de despliegue.
@@ -290,4 +427,4 @@ mínimos, que degradarían la calidad de las representaciones.
 | 3 — Compras simuladas | ✅ |
 | 4 — Puntos y logros | ✅ |
 | 5 — Recomendador de lecturas | ✅ |
-| 6 — Estadísticas, pulido y deploy | 🚧 en curso |
+| 6 — Estadísticas, pulido y deploy | ✅ |
